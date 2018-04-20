@@ -32,11 +32,11 @@ always_ff @(posedge clk, negedge rst_n) begin
 	baud_count <= 1'b0;
   else if(baud_full_tx)
     baud_count <= 1'b0; 
-  else if(baud_count != 12'hA2B) //2604
+  else if(baud_count != 12'hA2C) //2604
     baud_count <= baud_count + 1'b1;
   end
 
-assign baud_full_tx = (baud_count == 12'hA2B) ? 1'b1 : 1'b0; 
+assign baud_full_tx = (baud_count == 12'hA2C) ? 1'b1 : 1'b0; 
 
 /////////////////////////
 // 4-bit index counter //
