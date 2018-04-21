@@ -15,6 +15,7 @@ module SNN(clk, sys_rst_n, led, uart_tx, uart_rx);
 	Reset synchronizer
 	******************************************************/
 	rst_synch i_rst_synch(.clk(clk), .sys_rst_n(sys_rst_n), .rst_n(rst_n));
+	ram_input_unit riu1(data, addr, we, clk, q); 
 	
 	/******************************************************
 	UART
