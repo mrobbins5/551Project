@@ -1,4 +1,4 @@
-module rom (
+module rom_act_func_lut (
  input [(ADDR_WIDTH-1):0] addr,
  input clk,
  output reg [(DATA_WIDTH-1):0] q);

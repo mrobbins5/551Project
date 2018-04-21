@@ -1,4 +1,4 @@
-module rom (
+module rom_hidden_weight (
  input [(ADDR_WIDTH-1):0] addr,
  input clk,
  output reg [(DATA_WIDTH-1):0] q);

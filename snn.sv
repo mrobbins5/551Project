@@ -10,6 +10,8 @@ module SNN(clk, sys_rst_n, led, uart_tx, uart_rx);
 	logic rst_n;				 	// Synchronized active low reset
 	
 	logic uart_rx_ff, uart_rx_synch;
+	
+	logic rx_rdy; //leave unconnected
 
 	/******************************************************
 	Reset synchronizer
@@ -21,8 +23,6 @@ module SNN(clk, sys_rst_n, led, uart_tx, uart_rx);
 	******************************************************/
 	
 	// Declare wires below
-	
-	logic [7:0] uart_data;
 	
 	// Double flop RX for meta-stability reasons
 	always_ff @(posedge clk, negedge rst_n)
@@ -37,14 +37,17 @@ module SNN(clk, sys_rst_n, led, uart_tx, uart_rx);
 	
 	// Instantiate UART_RX and UART_TX and connect them below
 	// For UART_RX, use "uart_rx_synch", which is synchronized, not "uart_rx".
+	uart_rx instance1(clk,rst_n,uart_rx,rx_rdy,uart_rx); 
+	//module uart_rx(clk,rst_n,rx,rx_rdy,rx_data);
 	
-	uart_rx instance1(.clk(clk),.rst_n(rst_n),.rx(uart_rx_synch),.rx_rdy(rx_rdy),.rx_data(uart_data));
-	uart_tx instance2(.clk(clk),.rst_n(rst_n),.tx_start(rx_rdy),.tx_data(uart_data),.tx(uart_tx),.tx_rdy());
-	
+	uart_tx instance2(clk,rst_n,rx_rdy,rx_data,uart_tx,tx_rdy); 
+	//module uart_tx(clk,rst_n,tx_start,tx_data,tx,tx_rdy);
 			
 	/******************************************************
 	LED
 	******************************************************/
-	assign led = uart_data;
+	assign led = rx_data;
 
 endmodule
+
+
