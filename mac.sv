@@ -30,14 +30,6 @@ end
 
 //Datapath -> Dataflow
 
-//Sign extend the first bit of multiplier
-assign testMULT = {mult[15], mult[15:0]};
-
-//Sign extend the first bit of accumulator
-assign testACC = {acc[25], acc[25:0]};
-
-//Sum and compare
-assign testSUM = testMULT + testACC; //
 assign acc_nxt = (clr_n) ? (mult + acc) : 26'h0000000;   //Sets the next value of transition (If not reset) to be equalt to mult+acc 
 assign mult = a*b; 
 		
