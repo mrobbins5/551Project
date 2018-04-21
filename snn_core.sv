@@ -25,11 +25,18 @@ state_t cur_state, nxt_state;
 //Instantiate MAC module 
 mac mac1(acc, in1, in2, clr, clk, rst_n);
 
+//***************ROM*******************//
+
 //Instantiate rom_hidden_weight
 rom_hidden_weight rhw1(addr, clk, q);
  
 //Instantiate rom_output_weight 
 rom_output_weight row1(addr, clk, q);
+
+//Instantiate rom_act_func_lut
+rom_act_func_lut rafl(addr, clk, q); 
+
+//***************RAM*******************//
 
 //Instantiate ram_hidden_unit
 ram_hidden_unit rhu1(data, addr, we, clk, q); 
@@ -37,8 +44,8 @@ ram_hidden_unit rhu1(data, addr, we, clk, q);
 //Instantiate ram_output_unit
 ram_output_unit rou1(data, addr, we, clk, q); 
 
-//Instantiate rom_act_func_lut
-rom_act_func_lut rafl(addr, clk, q); 
+//Instantiate ram_input_unit
+ram_input_unit riu1(data, addr, we, clk, q); 
 
 //SEQUENTIAL LOGIC/////////////////////////////////////////////////////////////////////////////
 
