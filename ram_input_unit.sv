@@ -1,4 +1,4 @@
-module ram_output_unit (
+module ram_input_unit (
  input [(DATA_WIDTH-1):0] data,
  input [(ADDR_WIDTH-1):0] addr,
  input we, clk,
