@@ -14,6 +14,19 @@ output logic [9:0] addr_input_unit;
 output logic [3:0] digit; 
 output logic done; 
 
+//Counting stuff
+logic [9:0] count784; 
+logic [5:0] count32; 
+logic clear32Flag, clear784Flag;
+
+//internal inputs for mac
+signed logic [7:0] in1, in2;
+//internal output of mac
+logic signed [25:0] acc;
+//internal clear for mac
+logic clr; 
+
+
 logic signed [7:0] q_ext; 
 //FSM Design modeled by professor's diagram/// BP = "Back Porch"
 typedef enum [3:0]{IDLE, MAC_HIDDEN, MAC_HIDDEN_BP1, MAC_HIDDEN_BP2, MAC_HIDDEN_WRITE, 
@@ -21,7 +34,7 @@ typedef enum [3:0]{IDLE, MAC_HIDDEN, MAC_HIDDEN_BP1, MAC_HIDDEN_BP2, MAC_HIDDEN_
 
 state_t cur_state, nxt_state; 
 
-
+ 
 
 //Instantiate MAC module 
 mac mac1(acc, in1, in2, clr, clk, rst_n);
@@ -30,8 +43,9 @@ mac mac1(acc, in1, in2, clr, clk, rst_n);
 assign rect_addr = (acc[25] == 0 && |acc[24:17] ) ? 11'h3FF :
 		(acc[25] == 1 && &acc[24:17]) ? 11'h400 : acc [17:7];
 assign addr = rect_addr + 11'h400; 
-		
-		
+
+
+
 //************************************ROM***************************************//
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -67,7 +81,24 @@ always_ff @(posedge clk, negedge rst_n) begin
 	else cur_state <= nxt_state;
 end
 
-//May need another sequential for back porches/counters
+//784 and 32 Counter logic for FSM 
+always_ff @(posedge clk, negedge rst_n) begin
+
+	if(!rst_n) begin
+		count784 <= 8'b0; 
+		count32 <= 8'b0; 
+	end
+	
+	else begin
+
+		if(clear784Flag) count784 <= 8'b0; 
+		else count784 <= count784 + 1'b1; 
+		
+		if(clear32Flag) count32 <= 8'b0; 
+		else count32 <= count32 + 1'b1; 
+		
+	end
+end
 
 //COMBINATIONAL LOGIC//////////////////////////////////////////////////////////////////////////  
 always_comb begin
@@ -75,40 +106,73 @@ always_comb begin
 	done = 0; 
 	digit = 4'b0000; 
 	addr_input_unit = 10'b00_0000_0000;
+	clear784Flag = 1'b0; 
+	clear32Flag = 1'b0; 
 	
 	case(cur_state)
 	IDLE : begin
 		//Wait until "start"
+		clear784Flag = 1'b1; //Set clear 784 flag
 		if(start) nxt_state = MAC_HIDDEN; 
 		else nxt_state = IDLE; 
 	end
+	
 	MAC_HIDDEN : begin
-		//if(something<32) nxt_state = MAC_HIDDEN; 
+		//Check for both inputs to be received
+		if() nxt_state = MAC_HIDDEN; 
+		else nxt_state = MAC_HIDDEN_BP1; 
 	end
+	
 	MAC_HIDDEN_BP1 : begin
-	
+		//Take time to do the calculation
+		nxt_state = MAC_HIDDEN_BP2;
+		in1 = q_ext; 
+		in2 = q1;
 	end
+	
 	MAC_HIDDEN_BP2 : begin
-	
+		//Take time to do yield the output
+		nxt_state = MAC_HIDDEN_WRITE; 
+		
 	end
+	
 	MAC_HIDDEN_WRITE : begin
-	
+		//Set the inputs to the MAC 
+		
+		
+		//Haven't finished all 784 bits 
+		if(!(count784 == 12'h310)) nxt_state = MAC_HIDDEN;		
+		
+		//Finished all 784 bits
+		else nxt_state = MAC_OUTPUT; 
+
 	end 
+	
 	MAC_OUTPUT : begin
-	
+		if() nxt_state = MAC_OUTPUT; 
+		else nxt_state = MAC_OUTPUT_BP1; 
 	end
+	
 	MAC_OUTPUT_BP1 : begin
-	
+		nxt_state = MAC_OUTPUT_BP2; 
 	end
+	
 	MAC_OUTPUT_BP2 : begin
-	
+		nxt_state = MAC_OUTPUT_WRITE; 
 	end
+	
 	MAC_OUTPUT_WRITE : begin
-	
+		if(!(count32 == 6'h20) nxt_state = MAC_OUTPUT; 
+		else begin 
+			nxt_state = DONE; 
+			clear32Flag = 1'b1; //Set clear 32 flag
+		end
 	end
+	
 	DONE : begin
-	
+		nxt_state = IDLE; 
 	end
+	
 	//If we go out of bounds
 	default : begin
 		nxt_state = IDLE; 
