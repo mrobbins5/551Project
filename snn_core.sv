@@ -65,11 +65,13 @@ rom_act_func_lut rafl(addr, clk, q_lut);
 ram_hidden_unit rhu1(data, addr, we, clk, q_weight_hidden); 
 
 //Instantiate ram_output_unit
-ram_output_unit rou1(data, addr, we, clk, q_weight_output); 
+ram_output_unit rou1(data, addr, we2, clk, q_weight_output); 
 
 
 //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111).
 assign q_ext = (q_input) ? 8'h7F : 8'h0 ;
+
+assign data = (we) ? q_lut : ; //TODO
 
 // assign addr_hidden_weight = (some flag from FSM) addr_hidden_weight + 1 : addr_hidden_weight;
 
@@ -92,10 +94,10 @@ always_ff @(posedge clk, negedge rst_n) begin
 	else begin
 
 		if(clear784Flag) count784 <= 8'b0; 
-		else count784 <= count784 + 1'b1; 
+		else if (cur_state == MAC_HIDDEN || cur_state == MAC_OUTPUT_WRITE)count784 <= count784 + 1'b1; 
 		
 		if(clear32Flag) count32 <= 8'b0; 
-		else count32 <= count32 + 1'b1; 
+		else if(cur_state == MAC_HIDDEN_WRITE||cur_state==MAC_OUTPUT) count32 <= count32 + 1'b1; 
 		
 	end
 end
@@ -108,26 +110,34 @@ always_comb begin
 	addr_input_unit = 10'b00_0000_0000;
 	clear784Flag = 1'b0; 
 	clear32Flag = 1'b0; 
+	clr = 0; 
 	
 	case(cur_state)
 	IDLE : begin
 		//Wait until "start"
 		clear784Flag = 1'b1; //Set clear 784 flag
+		
 		if(start) nxt_state = MAC_HIDDEN; 
 		else nxt_state = IDLE; 
 	end
 	
 	MAC_HIDDEN : begin
 		//Check for both inputs to be received
-		if() nxt_state = MAC_HIDDEN; 
-		else nxt_state = MAC_HIDDEN_BP1; 
+		//If we haven't counted to 784, stay here
+		if(count784 != 12'h310) nxt_state = MAC_HIDDEN; 
+		
+		//Continue to next state
+		else begin
+			nxt_state = MAC_HIDDEN_BP1; 
+			in1 = q_ext; 
+			in2 = q1;
+		end
 	end
 	
 	MAC_HIDDEN_BP1 : begin
 		//Take time to do the calculation
 		nxt_state = MAC_HIDDEN_BP2;
-		in1 = q_ext; 
-		in2 = q1;
+
 	end
 	
 	MAC_HIDDEN_BP2 : begin
@@ -141,15 +151,20 @@ always_comb begin
 		
 		
 		//Haven't finished all 784 bits 
-		if(!(count784 == 12'h310)) nxt_state = MAC_HIDDEN;		
-		
-		//Finished all 784 bits
-		else nxt_state = MAC_OUTPUT; 
-
+		if(count32 != 6'h20) begin
+			nxt_state = MAC_HIDDEN;
+			clear784Flag = 1'b1; 
+			clr = 1'b1; 
+		end
+		//Finished all 32 bits
+		else begin
+			nxt_state = MAC_OUTPUT;
+			clear32Flag = 1'b1; 
+		end
 	end 
 	
 	MAC_OUTPUT : begin
-		if() nxt_state = MAC_OUTPUT; 
+		if(count32 != 6'h20) nxt_state = MAC_OUTPUT; 
 		else nxt_state = MAC_OUTPUT_BP1; 
 	end
 	
@@ -159,13 +174,17 @@ always_comb begin
 	
 	MAC_OUTPUT_BP2 : begin
 		nxt_state = MAC_OUTPUT_WRITE; 
+		clear32Flag = 1'b1; 
 	end
 	
 	MAC_OUTPUT_WRITE : begin
-		if(!(count32 == 6'h20) nxt_state = MAC_OUTPUT; 
+		if(count784 != 6'h0A) begin
+			nxt_state = MAC_OUTPUT; //We reuse 784 counter to count to 10
+			clear32Flag = 1'b1; 
+			clr = 1'b1; 
+		end
 		else begin 
 			nxt_state = DONE; 
-			clear32Flag = 1'b1; //Set clear 32 flag
 		end
 	end
 	
