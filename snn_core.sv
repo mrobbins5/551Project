@@ -7,43 +7,36 @@
 module snn_core(clk, rst_n, start, q_input, addr_input_unit, digit, done); 
 
 input logic start; 
-input logic d_input; 
+input logic q_input; 
 input logic clk, rst_n; 
 
 output logic [9:0] addr_input_unit; 
 output logic [3:0] digit; 
 output logic done; 
 
-//Counting stuff
+//Counting 
 logic [9:0] count784; 
 logic [5:0] count32; 
-logic clear32Flag, clear784Flag;
+logic clear32Flag, clear784Flag, macIn1Sel, macIn2Sel, doneFlag;
 
-//internal inputs for mac
-signed logic [7:0] in1, in2;
-//internal output of mac
-logic signed [25:0] acc;
-//internal clear for mac
-logic clr; 
 
+logic signed  [7:0] in1, in2; 		//internal inputs for mac
+logic signed [25:0] acc; 			//internal output of mac
+logic clr; 							//internal clear for mac
+
+//Address
+logic [10:0] addr; 
 
 logic signed [7:0] q_ext; 
 //FSM Design modeled by professor's diagram/// BP = "Back Porch"
-typedef enum [3:0]{IDLE, MAC_HIDDEN, MAC_HIDDEN_BP1, MAC_HIDDEN_BP2, MAC_HIDDEN_WRITE, 
+typedef enum logic [3:0] {IDLE, MAC_HIDDEN, MAC_HIDDEN_BP1, MAC_HIDDEN_BP2, MAC_HIDDEN_WRITE, 
 					MAC_OUTPUT, MAC_OUTPUT_BP1, MAC_OUTPUT_BP2, MAC_OUTPUT_WRITE, DONE} state_t; 
 
 state_t cur_state, nxt_state; 
-
  
 
-//Instantiate MAC module 
+//////////////////////////////Instantiate MAC module////////////////////////////// 
 mac mac1(acc, in1, in2, clr, clk, rst_n);
-
-//rect // address TODO
-assign rect_addr = (acc[25] == 0 && |acc[24:17] ) ? 11'h3FF :
-		(acc[25] == 1 && &acc[24:17]) ? 11'h400 : acc [17:7];
-assign addr = rect_addr + 11'h400; 
-
 
 
 //************************************ROM***************************************//
@@ -62,20 +55,20 @@ rom_act_func_lut rafl(addr, clk, q_lut);
 //////////////////////////////////////////////////////////////////////////////////
 
 //Instantiate ram_hidden_unit
-ram_hidden_unit rhu1(data, addr, we, clk, q_weight_hidden); 
+ram_hidden_unit rhu1(data1, addr, we, clk, q_weight_hidden); 
 
 //Instantiate ram_output_unit
-ram_output_unit rou1(data, addr, we2, clk, q_weight_output); 
+ram_output_unit rou1(data2, addr, we, clk, q_weight_output); 
 
 
 //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111).
 assign q_ext = (q_input) ? 8'h7F : 8'h0 ;
+assign data1 = q_lut;
+assign data2 = (doneFlag)? q_lut : 1'b0;
+assign in1 = (macIn1Sel) ? q_weight_hidden : q_ext; // First 2:1 mux (M1) // q_input (extended) vs ram_hidden_unit
+assign in2 = (macIn2Sel) ? q2 : q1; // Second 2:1 mux (M2) // rom_hidden_weight vs rom_output weight
 
-assign data = (we) ? q_lut : ; //TODO
-
-// assign addr_hidden_weight = (some flag from FSM) addr_hidden_weight + 1 : addr_hidden_weight;
-
-//SEQUENTIAL LOGIC/////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////SEQUENTIAL LOGIC////////////////////////////////
 
 //FSM sequential logic
 always_ff @(posedge clk, negedge rst_n) begin
@@ -102,21 +95,31 @@ always_ff @(posedge clk, negedge rst_n) begin
 	end
 end
 
-//COMBINATIONAL LOGIC//////////////////////////////////////////////////////////////////////////  
+//////////////////////////////////Rectify address/////////////////////////////////
+assign rect_addr = (acc[25] == 0 && |acc[24:17] ) ? 11'h3FF :
+		(acc[25] == 1 && &acc[24:17]) ? 11'h400 : acc [17:7];
+assign addr = rect_addr + 11'h400; 
+
+/////////////////////////////////ASSIGN OUTPUTS///////////////////////////////////
+assign addr_input_unit = addr[9:0]; 
+assign digit = q_weight_output; 
+assign done = (doneFlag) ? 1'b1 : 1'b0; 
+
+////////////////////////////////////////COMBINATIONAL LOGIC////////////////////////////////////
 always_comb begin
 	//Initialize all output variables
-	done = 0; 
-	digit = 4'b0000; 
-	addr_input_unit = 10'b00_0000_0000;
 	clear784Flag = 1'b0; 
 	clear32Flag = 1'b0; 
 	clr = 0; 
+	doneFlag = 0; 
+
 	
-	case(cur_state)
+	case(cur_state) 
 	IDLE : begin
 		//Wait until "start"
 		clear784Flag = 1'b1; //Set clear 784 flag
-		
+		macIn1Sel = 0; 
+		macIn2Sel = 0; 
 		if(start) nxt_state = MAC_HIDDEN; 
 		else nxt_state = IDLE; 
 	end
@@ -129,8 +132,6 @@ always_comb begin
 		//Continue to next state
 		else begin
 			nxt_state = MAC_HIDDEN_BP1; 
-			in1 = q_ext; 
-			in2 = q1;
 		end
 	end
 	
@@ -160,6 +161,8 @@ always_comb begin
 		else begin
 			nxt_state = MAC_OUTPUT;
 			clear32Flag = 1'b1; 
+			macIn2Sel = 1'b1; 
+			macIn1Sel = 1'b1; 
 		end
 	end 
 	
@@ -190,6 +193,7 @@ always_comb begin
 	
 	DONE : begin
 		nxt_state = IDLE; 
+		doneFlag = 1'b1; 
 	end
 	
 	//If we go out of bounds
@@ -197,9 +201,10 @@ always_comb begin
 		nxt_state = IDLE; 
 	end
 	
-		
-
+	endcase
+	
 end
 
 endmodule
+
 
