@@ -1,3 +1,6 @@
+localparam DATA_WIDTH = 4'h8; 
+localparam ADDR_WIDTH = 4'h9; 
+
 module rom_output_weight (
  input [(ADDR_WIDTH-1):0] addr,
  input clk,

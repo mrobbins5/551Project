@@ -1,3 +1,6 @@
+localparam DATA_WIDTH = 4'h8; 
+localparam ADDR_WIDTH = 4'hB; 
+
 module rom_act_func_lut (
  input [(ADDR_WIDTH-1):0] addr,
  input clk,

@@ -1,3 +1,6 @@
+localparam DATA_WIDTH = 1'b1; 
+localparam ADDR_WIDTH = 4'hA; 
+
 module ram_input_unit (
  input [(DATA_WIDTH-1):0] data,
  input [(ADDR_WIDTH-1):0] addr,
