@@ -15,11 +15,16 @@ rst_synch i_rst_synch(.clk(clk), .sys_rst_n(sys_rst_n), .rst_n(rst_n));
 /******************************************************
 RAM
 ******************************************************/
-ram_input_unit riu1(data, addr, we, clk, q_input); 
+logic q_input;
+logic we;
+logic [9:0] addr_input_unit;
+ram_input_unit riu1(uart_data, addr_input_unit, we, clk, q_input); 
 
 /******************************************************
 SNN_CORE
 ******************************************************/
+logic start;
+logic [3:0] digit;
 snn_core sc(clk, rst_n, start, q_input, addr_input_unit, digit, done); 
 
 /******************************************************
@@ -28,6 +33,8 @@ UART_TX, UART_RX
 
 // Declare wires below
 logic [7:0] uart_data;
+logic tx_rdy;
+logic rx_rdy;
 
 // Double flop RX for meta-stability reasons
 always_ff @(posedge clk, negedge rst_n)
@@ -43,7 +50,7 @@ end
 // For UART_RX, use "uart_rx_synch", which is synchronized, not "uart_rx".
 
 uart_rx instance1(.clk(clk),.rst_n(rst_n),.rx(uart_rx_synch),.rx_rdy(rx_rdy),.rx_data(uart_data));
-uart_tx instance2(.clk(clk),.rst_n(rst_n),.tx_start(done),.tx_data(led),.tx(uart_tx),.tx_rdy());
+uart_tx instance2(.clk(clk),.rst_n(rst_n),.tx_start(done),.tx_data(led),.tx(uart_tx),.tx_rdy(tx_rdy));
 
 /****************************
 CONTROL FSM
@@ -52,7 +59,7 @@ CONTROL FSM
 //start is an input to FSM
 //done is an input to FSM
 
-typedef enum logic [2:0] {IDLE, RX, RAM, CORE, TX} state_t; 
+typedef enum logic [1:0] {RX, CORE, TX} state_t; 
 
 state_t cur_state, nxt_state; 
 
@@ -63,29 +70,46 @@ end
 
 always_comb begin
 case(cur_state)
-start = 1'b0;
+	start = 1'b0; // start SNN core
+	clear_cycle = 1'b0;
+we = 1'b0;
 	RX : begin
-		if (cycle_full)
+		if (cycle_full) begin
 			nxt_state = RAM;
+			start = 1'b1;
+			end
+		else if (rx_rdy) begin
+			we = 1b'1;
+			nxt_state = RX;
+			end
 		else
 			nxt_state = RX;
 	end
-	RAM : begin
-	end
+	
+	
 	CORE : begin
-	start = 1'b1;
+	if (done)
+		nxt_state = TX;
+	else
+		nxt_state = CORE;
 	end
+	
 	TX: begin
-		
+		if (tx_rdy) begin
+			nxt_state = RX;
+			clear_cycle = 1'b1;
+		end
+		else
+			nxt_state = TX;
 	end
 	default: begin
-	nxt_state = IDLE;
+		nxt_state = RX;
 	end
 end
 
-/////////////////////////
-// 7-bit byte counter //
-/////////////////////////
+////////////////////////////////////
+// 7-bit (98 cycles) byte counter //
+////////////////////////////////////
 logic [6:0] cycle;
 logic clear_cycle, cycle_full;
 
