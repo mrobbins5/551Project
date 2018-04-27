@@ -9,8 +9,8 @@ module rom_hidden_weight (
  // Declare the ROM variable
  reg [DATA_WIDTH-1:0] rom[2**ADDR_WIDTH-1:0];
  initial
- readmemh("rom_hidden_weight_contents.txt", rom);
- end
+ $readmemh("rom_hidden_weight_contents.txt", rom);
+ 
  always @ (posedge clk)
  begin
  q <= rom[addr];

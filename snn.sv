@@ -18,6 +18,7 @@ RAM
 logic q_input;
 logic we;
 logic [9:0] addr_input_unit;
+logic [7:0] uart_data;
 ram_input_unit riu1(uart_data, addr_input_unit, we, clk, q_input); 
 
 /******************************************************
@@ -32,7 +33,7 @@ UART_TX, UART_RX
 ******************************************************/
 
 // Declare wires below
-logic [7:0] uart_data;
+
 logic tx_rdy;
 logic rx_rdy;
 
@@ -63,31 +64,33 @@ typedef enum logic [1:0] {RX, CORE, TX} state_t;
 
 state_t cur_state, nxt_state; 
 
+logic clear_cycle, cycle_full;
+logic [6:0] cycle;
+
 always_ff @(posedge clk, negedge rst_n) begin
-	if(!rst_n) cur_state <= IDLE; 
+	if(!rst_n) cur_state <= RX; 
 	else cur_state <= nxt_state;
 end
 
 always_comb begin
-case(cur_state)
 	start = 1'b0; // start SNN core
 	clear_cycle = 1'b0;
-we = 1'b0;
-	RX : begin
+	we = 1'b0;
+	case(cur_state)
+	RX: begin
 		if (cycle_full) begin
-			nxt_state = RAM;
+			nxt_state = CORE;
 			start = 1'b1;
 			end
 		else if (rx_rdy) begin
-			we = 1b'1;
+			we = 1'b1;
 			nxt_state = RX;
 			end
 		else
 			nxt_state = RX;
 	end
 	
-	
-	CORE : begin
+	CORE: begin
 	if (done)
 		nxt_state = TX;
 	else
@@ -105,15 +108,17 @@ we = 1'b0;
 	default: begin
 		nxt_state = RX;
 	end
+	endcase
 end
+
 
 ////////////////////////////////////
 // 7-bit (98 cycles) byte counter //
 ////////////////////////////////////
-logic [6:0] cycle;
-logic clear_cycle, cycle_full;
 
-always_ff @ (posedge clk or negedge rst_n) begin
+
+
+always_ff @(posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		cycle <= 1'b0;
 	end 

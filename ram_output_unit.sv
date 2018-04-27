@@ -12,8 +12,7 @@ module ram_output_unit (
  reg [ADDR_WIDTH-1:0] addr_reg;
 
  initial
- readmemh("ram_output_contents.txt", ram);
- end
+	$readmemh("ram_output_contents.txt", ram);
 
  always @ (posedge clk)
  begin
