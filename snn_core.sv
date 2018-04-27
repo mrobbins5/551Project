@@ -183,14 +183,16 @@ always_comb begin
 			clear32Flag = 1'b1; 
 			macIn2Sel = 1'b1; 
 			macIn1Sel = 1'b1; 
+
 		end
 	end 
 	
 	MAC_OUTPUT : begin
+		addr_output_weight_inc = 1'b1; 
 		if(count32 != 6'h20) nxt_state = MAC_OUTPUT; 
 		else begin
 			nxt_state = MAC_OUTPUT_BP1; 
-			addr_output_weight
+			addr_output_weight_inc = 1'b0; 
 		end
 	end
 	
@@ -204,6 +206,7 @@ always_comb begin
 	end
 	
 	MAC_OUTPUT_WRITE : begin
+		addr_output_weight_inc = 1'b1; 
 		if(count784 != 6'h0A) begin
 			nxt_state = MAC_OUTPUT; //We reuse 784 counter to count to 10
 			clear32Flag = 1'b1; 
