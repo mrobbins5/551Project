@@ -22,7 +22,7 @@ logic clear32Flag, clear784Flag, macIn1Sel, macIn2Sel, doneFlag;
 
 logic signed  [7:0] in1, in2; 		//internal inputs for mac
 logic signed [25:0] acc; 			//internal output of mac
-logic clr; 							//internal clear for mac
+logic mac_clr; 							//internal clear for mac
 
 //Address
 logic [10:0] addr; 
@@ -36,17 +36,16 @@ state_t cur_state, nxt_state;
  
 
 //////////////////////////////Instantiate MAC module////////////////////////////// 
-mac mac1(acc, in1, in2, clr, clk, rst_n);
-
+mac mac1(acc, in1, in2, mac_clr, clk, rst_n);
 
 //************************************ROM***************************************//
 //////////////////////////////////////////////////////////////////////////////////
 
 //Instantiate rom_hidden_weight
-rom_hidden_weight rhw1(addr, clk, q1);
+rom_hidden_weight rhw1(addr_hidden_weight, clk, q_weight_hidden);
  
 //Instantiate rom_output_weight 
-rom_output_weight row1(addr, clk, q2);
+rom_output_weight row1(addr_output_weight, clk, q_weight_output);
 
 //Instantiate rom_act_func_lut
 rom_act_func_lut rafl(addr, clk, q_lut); 
@@ -55,18 +54,17 @@ rom_act_func_lut rafl(addr, clk, q_lut);
 //////////////////////////////////////////////////////////////////////////////////
 
 //Instantiate ram_hidden_unit
-ram_hidden_unit rhu1(data1, addr, we, clk, q_weight_hidden); 
+ram_hidden_unit rhu1(d_hidden_unit, addr_hidden_unit, we, clk, q_hidden_unit); 
 
 //Instantiate ram_output_unit
-ram_output_unit rou1(data2, addr, we, clk, q_weight_output); 
-
+ram_output_unit rou1(d_output_unit, addr, we, clk, q_weight_output); 
 
 //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111).
 assign q_ext = (q_input) ? 8'h7F : 8'h0 ;
-assign data1 = q_lut;
-assign data2 = (doneFlag)? q_lut : 1'b0;
-assign in1 = (macIn1Sel) ? q_weight_hidden : q_ext; // First 2:1 mux (M1) // q_input (extended) vs ram_hidden_unit
-assign in2 = (macIn2Sel) ? q2 : q1; // Second 2:1 mux (M2) // rom_hidden_weight vs rom_output weight
+assign d_hidden_unit = q_lut;
+assign d_output_unit = (doneFlag) ? q_lut : 1'b0;
+assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; // First 2:1 mux (M1) // q_input (extended) vs ram_hidden_unit
+assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; // Second 2:1 mux (M2) // rom_hidden_weight vs rom_output weight
 
 //////////////////////////////////////////////SEQUENTIAL LOGIC////////////////////////////////
 
@@ -78,20 +76,15 @@ end
 
 //784 and 32 Counter logic for FSM 
 always_ff @(posedge clk, negedge rst_n) begin
-
 	if(!rst_n) begin
 		count784 <= 8'b0; 
 		count32 <= 8'b0; 
 	end
-	
 	else begin
-
 		if(clear784Flag) count784 <= 8'b0; 
-		else if (cur_state == MAC_HIDDEN || cur_state == MAC_OUTPUT_WRITE)count784 <= count784 + 1'b1; 
-		
+		else if (cur_state == MAC_HIDDEN || cur_state == MAC_OUTPUT_WRITE)count784 <= count784 + 1'b1; 	
 		if(clear32Flag) count32 <= 8'b0; 
 		else if(cur_state == MAC_HIDDEN_WRITE||cur_state==MAC_OUTPUT) count32 <= count32 + 1'b1; 
-		
 	end
 end
 
@@ -101,25 +94,48 @@ assign rect_addr = (acc[25] == 0 && |acc[24:17] ) ? 11'h3FF :
 assign addr = rect_addr + 11'h400; 
 
 /////////////////////////////////ASSIGN OUTPUTS///////////////////////////////////
-assign addr_input_unit = addr[9:0]; 
 assign digit = q_weight_output; 
 assign done = (doneFlag) ? 1'b1 : 1'b0; 
+
+logic addr_input_inc,addr_input_clr,addr_hidden_weight_inc,addr_hidden_weight_clr,addr_hidden_unit_inc,addr_hidden_unit_clr;
+assign addr_input_unit = (addr_input_unit_inc) ? addr_input_unit + 1'b1 :
+						 (addr_input_unit_clr) ? 10'b0 : addr_input_unit;
+assign addr_hidden_weight = (addr_hidden_weight_inc) ? addr_hidden_weight + 1'b1 :
+						 (addr_hidden_weight_clr) ? 10'b0 : addr_hidden_weight;
+assign addr_hidden_unit = (addr_hidden_unit_inc) ? addr_hidden_unit + 1'b1 :
+						 (addr_hidden_unit_clr) ? 10'b0 : addr_hidden_unit;
+assign addr_output_weight = (addr_output_weight_inc) ? addr_output_weight + 1'b1 :
+						 (addr_output_weight_clr) ? 10'b0 : addr_output_weight;
+// addr_input_unit control RAM_INPUT_UNIT_Address
+// and increment every time it gets a bit
 
 ////////////////////////////////////////COMBINATIONAL LOGIC////////////////////////////////////
 always_comb begin
 	//Initialize all output variables
 	clear784Flag = 1'b0; 
 	clear32Flag = 1'b0; 
-	clr = 0; 
-	doneFlag = 0; 
-
+	mac_clr = 1'b0; 
+	doneFlag = 1'b0; 
+	addr_input_unit_inc = 1'b0;
+	addr_input_unit_clr = 1'b0;
+	addr_hidden_weight_inc = 1'b0;
+	addr_hidden_weight_clr = 1'b0;
+	addr_hidden_unit_inc = 1'b0;
+	addr_hidden_unit_clr = 1'b0;
+	addr_output_weight_inc = 1'b0;
+	addr_output_weight_clr = 1'b0;
+	macIn1Sel = 1'b0; 
+	macIn2Sel = 1'b0; 
 	
 	case(cur_state) 
 	IDLE : begin
 		//Wait until "start"
 		clear784Flag = 1'b1; //Set clear 784 flag
-		macIn1Sel = 0; 
-		macIn2Sel = 0; 
+		addr_input_unit_clr = 1'b1;
+		addr_hidden_weight_clr = 1'b1;
+		addr_hidden_unit_clr = 1'b1;
+		macIn1Sel = 1'b0; 
+		macIn2Sel = 1'b0; 
 		if(start) nxt_state = MAC_HIDDEN; 
 		else nxt_state = IDLE; 
 	end
@@ -127,7 +143,11 @@ always_comb begin
 	MAC_HIDDEN : begin
 		//Check for both inputs to be received
 		//If we haven't counted to 784, stay here
-		if(count784 != 12'h310) nxt_state = MAC_HIDDEN; 
+		if(count784 != 12'h310) begin
+			nxt_state = MAC_HIDDEN; 
+			addr_input_unit_inc = 1'b1;
+			addr_hidden_weight_inc = 1'b1;
+		end
 		
 		//Continue to next state
 		else begin
@@ -155,7 +175,7 @@ always_comb begin
 		if(count32 != 6'h20) begin
 			nxt_state = MAC_HIDDEN;
 			clear784Flag = 1'b1; 
-			clr = 1'b1; 
+			mac_clr = 1'b1; 
 		end
 		//Finished all 32 bits
 		else begin
@@ -168,7 +188,10 @@ always_comb begin
 	
 	MAC_OUTPUT : begin
 		if(count32 != 6'h20) nxt_state = MAC_OUTPUT; 
-		else nxt_state = MAC_OUTPUT_BP1; 
+		else begin
+			nxt_state = MAC_OUTPUT_BP1; 
+			addr_output_weight
+		end
 	end
 	
 	MAC_OUTPUT_BP1 : begin
@@ -184,7 +207,7 @@ always_comb begin
 		if(count784 != 6'h0A) begin
 			nxt_state = MAC_OUTPUT; //We reuse 784 counter to count to 10
 			clear32Flag = 1'b1; 
-			clr = 1'b1; 
+			mac_clr = 1'b1; 
 		end
 		else begin 
 			nxt_state = DONE; 
