@@ -75,6 +75,52 @@ assign d_hidden_unit = q_lut;
 assign d_output_unit = (doneFlag) ? q_lut : 1'b0;
 assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; // First 2:1 mux (M1) // q_input (extended) vs ram_hidden_unit
 assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; // Second 2:1 mux (M2) // rom_hidden_weight vs rom_output weight
+logic new_val_higher;
+assign high_lut = (new_val_higher)? q_lut: high_lut;
+assign high_lut_index = (new_val_higher)? count784 : high_lut_index;
+
+
+always_comb begin
+
+	new_val_higher = 1'b0;
+
+	if(q_lut[7] == high_lut[7]) begin
+	
+		if(q_lut[6] == high_lut[6]) begin
+	
+			if(q_lut[5] == high_lut[5]) begin
+
+				if(q_lut[4] == high_lut[4]) begin
+
+					if(q_lut[3] == high_lut[3]) begin
+					
+						if(q_lut[2] == high_lut[2]) begin
+						
+							if(q_lut[1] == high_lut[1]) begin
+
+								if(q_lut[0] == high_lut[0]) begin
+
+									//SORRY Dr. Kim
+									//We could have used generate
+									//but the real goal here was to avoid > logic
+
+								end else if(q_lut[0]) new_val_higher = 1'b1;
+
+							end else if(q_lut[1]) new_val_higher = 1'b1;
+
+						end else if(q_lut[2]) new_val_higher = 1'b1;
+
+					end else if(q_lut[3]) new_val_higher = 1'b1;
+
+				end else if(q_lut[4]) new_val_higher = 1'b1;
+
+			end else if(q_lut[5]) new_val_higher = 1'b1;
+
+		end else if(q_lut[6]) new_val_higher = 1'b1;
+	
+	end else if(q_lut[7]) new_val_higher = 1'b1;
+	
+end
 
 //////////////////////////////////////////////SEQUENTIAL LOGIC////////////////////////////////
 
