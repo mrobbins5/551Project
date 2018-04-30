@@ -99,15 +99,19 @@ assign addr_act_func = rect_addr + 11'h400;
 /////////// ASSIGN OUTPUTS ///////////
 //////////////////////////////////////
 
-//assign digit = ; THIS IS NOT OUTPUT OF RAM OUT //TODO
+assign digit = addr_output_unit;
 assign done = (doneFlag) ? 1'b1 : 1'b0; 
 
 assign q_ext = (q_input) ? 8'h7F : 8'h0; //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111)
 assign d_hidden_unit = q_lut;
-assign d_output_unit = (doneFlag) ? q_lut : 1'b0;
+assign d_output_unit = q_lut;
 
-assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; 				//First 2:1 mux (M1): q_input (extended) OR ram_hidden_unit
-assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; 	//Second 2:1 mux (M2): rom_hidden_weight OR rom_output weight
+assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; 				//(M1): ram_hidden_unit OR q_input(ext)
+assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; 	//(M2): rom_output_weight OR rom_hidden_weight
+
+always_comb begin
+
+end
 
 /////////////////////////////////////////////////////
 ////////////////// ADDR ASSIGNMENT //////////////////
@@ -153,28 +157,26 @@ end
 /////// COMPARE ///////
 ///////////////////////
 
-logic begin_compare;
-logic [7:0] largest_val;
-logic [3:0] largest_indx;
+logic compare;
+logic [7:0] maxVal;
+logic [3:0] maxInd;
+integer x,y;
 
-/*always_ff @ (begin_compare) begin
-	integer x,y;
-	largest_indx = 4'b0;
-	largest_val = 8'b0;
-	for(x = 0; x<10; x++) begin
-		for(y=7; y>=0;y--) begin
-			if(largest_val[y]!=currentval[y]) begin ///read memh part done to get current values
-				if(largest_val[y]) begin
-					break;
-				end else begin
-					largest_val = currentval;
-					largest_indx = x; 
-				end
+always @ (compare) begin
+	if (!compare) begin
+		maxInd = 4'b0;
+		maxVal = 8'b0;
+	end
+	else begin
+	for(y = 7; y >= 0; y--) begin
+		if(maxVal[y] != d_output_unit[y]) begin ///read memh part done to get current values
+			if(!maxVal[y]) begin
+				maxVal = d_output_unit;
+				maxInd = addr_output_unit; 
 			end
 		end
 	end
-	doneCompare = 1'b1;
-end*/
+end
 
 /////////////////////////////////////////////
 //////////////// CONTROL FSM ////////////////
@@ -215,17 +217,16 @@ always_comb begin
 	we_ram_output_unit = 1'b0;
 	we_ram_hidden_unit = 1'b0;
 	
+	compare = 1'b0;
+	
 	case(cur_state) 
-	IDLE : begin //Wait until "start"
-		clear784Flag = 1'b1; //Set clear 784 flag
+	IDLE : begin
+		clear784Flag = 1'b1;
 		addr_input_unit_clr = 1'b1;
 		addr_hidden_weight_clr = 1'b1;
 		addr_hidden_unit_clr = 1'b1;
 		addr_output_weight_clr = 1'b1;
 		addr_output_unit_clr = 1'b1;
-		
-		macIn1Sel = 1'b0; 
-		macIn2Sel = 1'b0; 
 		
 		if (start)
 			nxt_state = MAC_HIDDEN; 
@@ -236,15 +237,12 @@ always_comb begin
 	MAC_HIDDEN : begin
 		//Check for both inputs to be received	
 		if (count784 != 12'h310) begin //If we haven't counted to 784, stay here
-			nxt_state = MAC_HIDDEN; 
 			addr_input_unit_inc = 1'b1;
 			addr_hidden_weight_inc = 1'b1;
+			nxt_state = MAC_HIDDEN;
 		end
-		
 		else begin
 			nxt_state = MAC_HIDDEN_BP1; 
-			addr_input_unit_inc = 1'b0; 
-			addr_hidden_weight_inc = 1'b0; 	
 		end
 	end
 	
@@ -258,60 +256,68 @@ always_comb begin
 	
 	MAC_HIDDEN_WRITE : begin
 		//Set the inputs to the MAC 		
-	
-		if (count32 != 6'h20) begin //Haven't finished all 784 bits 
-			nxt_state = MAC_HIDDEN;
-			addr_input_unit_inc = 1'b1;
-			addr_hidden_weight_inc = 1'b1;
+		we_ram_hidden_unit = 1'b1; //Write to ram_hidden_unit
+		if (count32 != 6'h20) begin //Haven't finished all 32 nodes
 			clear784Flag = 1'b1; 
 			mac_clr = 1'b1; 
+			addr_hidden_unit_inc = 1'b1;
+			nxt_state = MAC_HIDDEN;
 		end	
-		else begin //Finished all 32 bits
+		else begin
+			clear32Flag = 1'b1;
+			macIn1Sel = 1'b1;
+			macIn2Sel = 1'b1;
+			addr_hidden_unit_clr = 1'b1; // start at the begining of the ram
 			nxt_state = MAC_OUTPUT;
-			addr_input_unit_inc = 1'b0; 
-			addr_hidden_unit_inc = 1'b0; 
-			addr_output_unit_inc = 1'b1; 
-			clear32Flag = 1'b1; 
-			macIn2Sel = 1'b1; 
-			macIn1Sel = 1'b1; 
 		end
 	end
 	
 	MAC_OUTPUT : begin
-		addr_output_weight_inc = 1'b1; 
-		if (count32 != 6'h20)
-			nxt_state = MAC_OUTPUT; 
+			macIn1Sel = 1'b1;
+			macIn2Sel = 1'b1;
+		if (count32 != 6'h20) begin
+			addr_output_weight_inc = 1'b1;
+			addr_hidden_unit_inc = 1'b1;
+			nxt_state = MAC_OUTPUT;
+		end
 		else begin
-			nxt_state = MAC_OUTPUT_BP1; 
-			addr_output_weight_inc = 1'b0; 
+			nxt_state = MAC_OUTPUT_BP1;
 		end
 	end
 	
 	MAC_OUTPUT_BP1 : begin
+			macIn1Sel = 1'b1;
+			macIn2Sel = 1'b1;
 		nxt_state = MAC_OUTPUT_BP2; 
 	end
 	
 	MAC_OUTPUT_BP2 : begin
-		nxt_state = MAC_OUTPUT_WRITE; 
+		macIn1Sel = 1'b1;
+		macIn2Sel = 1'b1;
 		clear32Flag = 1'b1; 
+		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	
 	MAC_OUTPUT_WRITE : begin
-		addr_output_weight_inc = 1'b1; 
-		if (count784 != 6'h0A) begin
-			nxt_state = MAC_OUTPUT; //Reuse 784 counter to count to 10
-			clear32Flag = 1'b1; 
-			mac_clr = 1'b1; 
-			addr_output_unit_inc = 1'b1; 
+		we_ram_output_unit = 1'b1; //Write to ram_output_unit
+		macIn1Sel = 1'b1;
+		macIn2Sel = 1'b1;
+		compare = 1'b1;
+		if (count784 != 6'h0A) begin //Reuse 784 counter to count to 10
+			clear32Flag = 1'b1;
+			mac_clr = 1'b1;
+			addr_hidden_unit_clr = 1'b1;
+			addr_output_unit_inc = 1'b1;
+			nxt_state = MAC_OUTPUT;
 		end
 		else begin 
-			nxt_state = COMPARE; 
+			nxt_state = DONE; 
 		end
 	end
 	
 	DONE : begin
-		nxt_state = IDLE;  
 		doneFlag = 1'b1; 
+		nxt_state = IDLE;  
 	end
 
 	default : begin //If we go out of bounds
