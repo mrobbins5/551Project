@@ -14,9 +14,10 @@ logic [3:0] addr_output_unit;
 logic [10:0] addr_act_func;
 
 //Counter 
-logic [9:0] count784; 
-logic [5:0] count32; 
-logic clear32Flag, clear784Flag, macIn1Sel, macIn2Sel, doneFlag;
+logic [9:0] cnt_input; 
+logic [4:0] cnt_hidden;
+logic [3:0] cnt_output; 
+logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr, macIn1Sel, macIn2Sel, doneFlag;
 
 //Mac
 logic signed  [7:0] in1, in2; 		//Internal inputs for mac
@@ -29,6 +30,7 @@ logic addr_input_unit_inc, 		addr_input_unit_clr;		//Ram input unit
 logic addr_hidden_weight_inc, 	addr_hidden_weight_clr;		//Rom hidden weight
 logic addr_hidden_unit_inc, 	addr_hidden_unit_clr;		//Ram hidden unit
 logic addr_output_unit_inc,		addr_output_unit_clr;		//Ram output unit
+
 
 //FSM State
 typedef enum logic [3:0] {IDLE, MAC_HIDDEN, MAC_HIDDEN_BP1, MAC_HIDDEN_BP2, MAC_HIDDEN_WRITE, 
@@ -66,24 +68,30 @@ ram_hidden_unit RHU(d_hidden_unit, addr_hidden_unit, we_ram_hidden_unit, clk, q_
 ram_output_unit ROU(d_output_unit, addr_output_unit, we_ram_output_unit, clk, q_unit_output);	//Instantiate ram_output_unit
 
 ////////////////////////////////////////////
-//////////// 784 and 32 COUNTER ////////////
+//////////// 784, 32, and 10 COUNTER ////////////
 ////////////////////////////////////////////
 
 always_ff @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
-		count784	<= 8'b0; 
-		count32		<= 8'b0; 
+		cnt_input	<= 10'b0; 
+		cnt_hidden	<= 5'b0; 
+		cnt_output	<= 4'b0; 
 	end
 	else begin
-		if (clear784Flag)
-			count784 <= 8'b0; 
-		else if (cur_state == MAC_HIDDEN || cur_state == MAC_OUTPUT_WRITE)
-			count784 <= count784 + 1'b1;
+		if (cnt_input_clr)
+			cnt_input <= 10'b0; 
+		else if (cur_state == MAC_HIDDEN)
+			cnt_input <= cnt_input + 1'b1;
 		
-		if (clear32Flag)
-			count32 <= 8'b0; 
+		if (cnt_hidden_clr)
+			cnt_hidden <= 5'b0; 
 		else if (cur_state == MAC_HIDDEN_WRITE || cur_state == MAC_OUTPUT)
-			count32 <= count32 + 1'b1; 
+			cnt_hidden <= cnt_hidden + 1'b1; 
+			
+		if (cnt_output_clr)
+			cnt_output <= 4'b0; 
+		else if (cur_state == MAC_OUTPUT)
+			cnt_output <= cnt_output + 1'b1; 
 	end
 end
 
@@ -94,24 +102,6 @@ end
 assign rect_addr = (acc[25] == 0 && |acc[24:17] ) ? 11'h3FF :
 		(acc[25] == 1 && &acc[24:17]) ? 11'h400 : acc [17:7];
 assign addr_act_func = rect_addr + 11'h400; 
-
-//////////////////////////////////////
-/////////// ASSIGN OUTPUTS ///////////
-//////////////////////////////////////
-
-assign digit = addr_output_unit;
-assign done = (doneFlag) ? 1'b1 : 1'b0; 
-
-assign q_ext = (q_input) ? 8'h7F : 8'h0; //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111)
-assign d_hidden_unit = q_lut;
-assign d_output_unit = q_lut;
-
-assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; 				//(M1): ram_hidden_unit OR q_input(ext)
-assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; 	//(M2): rom_output_weight OR rom_hidden_weight
-
-always_comb begin
-
-end
 
 /////////////////////////////////////////////////////
 ////////////////// ADDR ASSIGNMENT //////////////////
@@ -133,8 +123,8 @@ always_ff @ (posedge clk, negedge rst_n) begin
 		
 		if (addr_hidden_weight_clr)
 			addr_hidden_weight <= 10'b0;
-		else if (addr_hidden_weight_inc)
-			addr_hidden_weight <= addr_hidden_weight + 1'b1;
+		else
+			addr_hidden_weight[14:0] = {cnt_hidden[4:0], cnt_input[9:0]};
 		
 		if (addr_hidden_unit_clr)
 			addr_hidden_unit <= 10'b0;
@@ -148,8 +138,8 @@ always_ff @ (posedge clk, negedge rst_n) begin
 			
 		if (addr_output_unit_clr) 
 			addr_output_unit <= 10'b0;
-		else if (addr_output_unit_inc)
-			addr_output_unit <= addr_output_unit + 1'b1;
+		else
+			addr_output_weight[8:0] <= {cnt_output[3:0], cnt_hidden[4:0]};
 	end
 end
 
@@ -160,10 +150,20 @@ end
 logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
-integer x,y;
 
-always @ (compare) begin
-	if (!compare) begin
+assign maxVal = (compare && maxVal >=  d_output_unit) ? maxVal : d_output_unit;
+assign maxInd = (compare && maxVal >=  d_output_unit) ? maxInd : addr_output_unit;
+
+	/*if (!rst_n) begin
+		maxInd <= 4'b0;
+		maxVal <= 8'b0;
+	end
+	else if (maxVal >  d_output_unit) begin ///read memh part done to get current values
+		maxVal <= d_output_unit;
+		maxInd <= addr_output_unit; 
+	end*/
+
+	/*if (!rst_n) begin
 		maxInd = 4'b0;
 		maxVal = 8'b0;
 	end
@@ -173,9 +173,28 @@ always @ (compare) begin
 			if(!maxVal[y]) begin
 				maxVal = d_output_unit;
 				maxInd = addr_output_unit; 
+				end
 			end
 		end
-	end
+	end*/
+//end
+
+//////////////////////////////////////
+/////////// ASSIGN OUTPUTS ///////////
+//////////////////////////////////////
+
+assign digit = maxInd;
+assign done = (doneFlag) ? 1'b1 : 1'b0; 
+
+assign q_ext = (q_input) ? 8'h7F : 8'h0; //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111)
+assign d_hidden_unit = q_lut;
+assign d_output_unit = q_lut;
+
+assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; 				//(M1): ram_hidden_unit OR q_input(ext)
+assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; 	//(M2): rom_output_weight OR rom_hidden_weight
+
+always_comb begin
+
 end
 
 /////////////////////////////////////////////
@@ -191,15 +210,15 @@ end
 
 always_comb begin
 	//default all output variables
-	clear784Flag = 1'b0; 
-	clear32Flag = 1'b0; 
+	cnt_input_clr = 1'b0; 
+	cnt_hidden_clr = 1'b0; 
+	cnt_output_clr = 1'b0;
 	mac_clr = 1'b0; 
 	doneFlag = 1'b0; 
 	
 	addr_input_unit_inc = 1'b0;
 	addr_input_unit_clr = 1'b0;
 	
-	addr_hidden_weight_inc = 1'b0;
 	addr_hidden_weight_clr = 1'b0;
 	
 	addr_hidden_unit_inc = 1'b0;
@@ -208,7 +227,6 @@ always_comb begin
 	addr_output_weight_inc = 1'b0;
 	addr_output_weight_clr = 1'b0;
 	
-	addr_output_unit_inc = 1'b0;
 	addr_output_unit_clr = 1'b0;
 	
 	macIn1Sel = 1'b0; 
@@ -221,7 +239,9 @@ always_comb begin
 	
 	case(cur_state) 
 	IDLE : begin
-		clear784Flag = 1'b1;
+		cnt_input_clr = 1'b1;
+		cnt_output_clr = 1'b1;
+		cnt_hidden_clr = 1'b1;
 		addr_input_unit_clr = 1'b1;
 		addr_hidden_weight_clr = 1'b1;
 		addr_hidden_unit_clr = 1'b1;
@@ -236,7 +256,7 @@ always_comb begin
 	
 	MAC_HIDDEN : begin
 		//Check for both inputs to be received	
-		if (count784 != 12'h310) begin //If we haven't counted to 784, stay here
+		if (cnt_input != 12'h30F) begin //If we haven't counted to 784, stay here
 			addr_input_unit_inc = 1'b1;
 			addr_hidden_weight_inc = 1'b1;
 			nxt_state = MAC_HIDDEN;
@@ -257,17 +277,18 @@ always_comb begin
 	MAC_HIDDEN_WRITE : begin
 		//Set the inputs to the MAC 		
 		we_ram_hidden_unit = 1'b1; //Write to ram_hidden_unit
-		if (count32 != 6'h20) begin //Haven't finished all 32 nodes
-			clear784Flag = 1'b1; 
+		addr_input_unit_clr = 1'b1;
+		if (cnt_hidden != 5'h1F) begin //Haven't finished all 32 nodes
+			cnt_input_clr = 1'b1; 
 			mac_clr = 1'b1; 
 			addr_hidden_unit_inc = 1'b1;
 			nxt_state = MAC_HIDDEN;
 		end	
 		else begin
-			clear32Flag = 1'b1;
+			cnt_hidden_clr = 1'b1;
 			macIn1Sel = 1'b1;
 			macIn2Sel = 1'b1;
-			addr_hidden_unit_clr = 1'b1; // start at the begining of the ram
+			addr_hidden_unit_clr = 1'b1;  // start at the begining of the ram
 			nxt_state = MAC_OUTPUT;
 		end
 	end
@@ -275,7 +296,7 @@ always_comb begin
 	MAC_OUTPUT : begin
 			macIn1Sel = 1'b1;
 			macIn2Sel = 1'b1;
-		if (count32 != 6'h20) begin
+		if (cnt_hidden != 5'h1F) begin
 			addr_output_weight_inc = 1'b1;
 			addr_hidden_unit_inc = 1'b1;
 			nxt_state = MAC_OUTPUT;
@@ -294,7 +315,7 @@ always_comb begin
 	MAC_OUTPUT_BP2 : begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
-		clear32Flag = 1'b1; 
+		cnt_hidden_clr = 1'b1; 
 		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	
@@ -303,8 +324,8 @@ always_comb begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
 		compare = 1'b1;
-		if (count784 != 6'h0A) begin //Reuse 784 counter to count to 10
-			clear32Flag = 1'b1;
+		if (cnt_output != 6'h09) begin
+			cnt_hidden_clr = 1'b1;
 			mac_clr = 1'b1;
 			addr_hidden_unit_clr = 1'b1;
 			addr_output_unit_inc = 1'b1;
