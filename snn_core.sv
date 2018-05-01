@@ -17,7 +17,7 @@ logic [10:0] addr_act_func;
 logic [9:0] cnt_input; 
 logic [4:0] cnt_hidden;
 logic [3:0] cnt_output; 
-logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr, macIn1Sel, macIn2Sel, doneFlag;
+logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr, macIn1Sel, macIn2Sel, doneFlag, cnt_output_inc;
 
 //Mac
 logic signed  [7:0] in1, in2; 		//Internal inputs for mac
@@ -25,12 +25,11 @@ logic signed [25:0] acc; 			//Internal output of mac
 logic mac_clr; 						//Internal clear for mac
 
 //Ram-Rom Address Clear/Inc
-logic addr_output_weight_inc, 	addr_output_weight_clr; 	//Rom output weight
+logic addr_output_weight_clr; 								//Rom output weight
 logic addr_input_unit_inc, 		addr_input_unit_clr;		//Ram input unit
-logic addr_hidden_weight_inc, 	addr_hidden_weight_clr;		//Rom hidden weight
+logic addr_hidden_weight_clr;								//Rom hidden weight
 logic addr_hidden_unit_inc, 	addr_hidden_unit_clr;		//Ram hidden unit
-logic addr_output_unit_inc,		addr_output_unit_clr;		//Ram output unit
-
+logic addr_output_unit_inc, 	addr_output_unit_clr;		//Ram output unit
 
 //FSM State
 typedef enum logic [3:0] {IDLE, MAC_HIDDEN, MAC_HIDDEN_BP1, MAC_HIDDEN_BP2, MAC_HIDDEN_WRITE, 
@@ -90,7 +89,7 @@ always_ff @(posedge clk, negedge rst_n) begin
 			
 		if (cnt_output_clr)
 			cnt_output <= 4'b0; 
-		else if (cur_state == MAC_OUTPUT)
+		else if (cnt_output_inc)
 			cnt_output <= cnt_output + 1'b1; 
 	end
 end
@@ -133,13 +132,13 @@ always_ff @ (posedge clk, negedge rst_n) begin
 		
 		if (addr_output_weight_clr) 
 			addr_output_weight <= 10'b0;
-		else if (addr_output_weight_inc)
-			addr_output_weight <= addr_output_weight + 1'b1;
+		else
+			addr_output_weight[8:0] <= {cnt_output[3:0], cnt_hidden[4:0]};
 			
 		if (addr_output_unit_clr) 
 			addr_output_unit <= 10'b0;
-		else
-			addr_output_weight[8:0] <= {cnt_output[3:0], cnt_hidden[4:0]};
+		else if (addr_output_unit_inc)
+			addr_output_unit <= addr_output_unit + 1'b1;
 	end
 end
 
@@ -213,6 +212,7 @@ always_comb begin
 	cnt_input_clr = 1'b0; 
 	cnt_hidden_clr = 1'b0; 
 	cnt_output_clr = 1'b0;
+	cnt_output_inc = 1'b0;
 	mac_clr = 1'b0; 
 	doneFlag = 1'b0; 
 	
@@ -224,9 +224,9 @@ always_comb begin
 	addr_hidden_unit_inc = 1'b0;
 	addr_hidden_unit_clr = 1'b0;
 	
-	addr_output_weight_inc = 1'b0;
 	addr_output_weight_clr = 1'b0;
 	
+	addr_output_unit_inc = 1'b0;
 	addr_output_unit_clr = 1'b0;
 	
 	macIn1Sel = 1'b0; 
@@ -258,7 +258,6 @@ always_comb begin
 		//Check for both inputs to be received	
 		if (cnt_input != 12'h30F) begin //If we haven't counted to 784, stay here
 			addr_input_unit_inc = 1'b1;
-			addr_hidden_weight_inc = 1'b1;
 			nxt_state = MAC_HIDDEN;
 		end
 		else begin
@@ -289,6 +288,7 @@ always_comb begin
 			macIn1Sel = 1'b1;
 			macIn2Sel = 1'b1;
 			addr_hidden_unit_clr = 1'b1;  // start at the begining of the ram
+			cnt_output_clr = 1'b1;
 			nxt_state = MAC_OUTPUT;
 		end
 	end
@@ -297,7 +297,7 @@ always_comb begin
 			macIn1Sel = 1'b1;
 			macIn2Sel = 1'b1;
 		if (cnt_hidden != 5'h1F) begin
-			addr_output_weight_inc = 1'b1;
+			////addr_output_weight_inc = 1'b1;
 			addr_hidden_unit_inc = 1'b1;
 			nxt_state = MAC_OUTPUT;
 		end
@@ -315,7 +315,7 @@ always_comb begin
 	MAC_OUTPUT_BP2 : begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
-		cnt_hidden_clr = 1'b1; 
+		/////////////////////////////cnt_hidden_clr = 1'b1; 
 		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	
@@ -329,6 +329,7 @@ always_comb begin
 			mac_clr = 1'b1;
 			addr_hidden_unit_clr = 1'b1;
 			addr_output_unit_inc = 1'b1;
+			cnt_output_inc = 1'b1;
 			nxt_state = MAC_OUTPUT;
 		end
 		else begin 
