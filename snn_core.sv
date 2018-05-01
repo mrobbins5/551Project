@@ -17,7 +17,7 @@ logic [10:0] addr_act_func;
 logic [9:0] cnt_input; 
 logic [4:0] cnt_hidden;
 logic [3:0] cnt_output; 
-logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr, macIn1Sel, macIn2Sel, doneFlag, cnt_output_inc;
+logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr, macIn1Sel, macIn2Sel, doneFlag, cnt_output_inc, cnt_input_inc;
 
 //Mac
 logic signed  [7:0] in1, in2; 		//Internal inputs for mac
@@ -40,7 +40,7 @@ state_t cur_state, nxt_state;
 //// MAC module ////
 ////////////////////
 
-mac MAC(acc, in1, in2, mac_clr, clk, rst_n); //Instantiate mac
+mac MAC(.acc(acc), .in1(in1), .in2(in2), .clr(mac_clr), .clk(clk), .rst_n(rst_n)); //Instantiate mac
 
 /////////////////////
 //////// ROM ////////
@@ -79,7 +79,7 @@ always_ff @(posedge clk, negedge rst_n) begin
 	else begin
 		if (cnt_input_clr)
 			cnt_input <= 10'b0; 
-		else if (cur_state == MAC_HIDDEN)
+		else if (cnt_input_inc)
 			cnt_input <= cnt_input + 1'b1;
 		
 		if (cnt_hidden_clr)
@@ -213,6 +213,7 @@ always_comb begin
 	cnt_hidden_clr = 1'b0; 
 	cnt_output_clr = 1'b0;
 	cnt_output_inc = 1'b0;
+	cnt_input_inc = 1'b0;
 	mac_clr = 1'b0; 
 	doneFlag = 1'b0; 
 	
@@ -239,6 +240,7 @@ always_comb begin
 	
 	case(cur_state) 
 	IDLE : begin
+		mac_clr = 1'b1; 
 		cnt_input_clr = 1'b1;
 		cnt_output_clr = 1'b1;
 		cnt_hidden_clr = 1'b1;
@@ -258,6 +260,7 @@ always_comb begin
 		//Check for both inputs to be received	
 		if (cnt_input != 12'h30F) begin //If we haven't counted to 784, stay here
 			addr_input_unit_inc = 1'b1;
+			cnt_input_inc = 1'b1;
 			nxt_state = MAC_HIDDEN;
 		end
 		else begin
