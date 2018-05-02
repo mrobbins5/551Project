@@ -333,8 +333,9 @@ always_comb begin
 	MAC_OUTPUT_BP2 : begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
-		//cnt_hidden_clr = 1'b1; 
-		
+		cnt_hidden_clr = 1'b1; 
+		addr_hidden_unit_clr = 1'b1;
+		cnt_output_inc = 1'b1;
 		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	
@@ -343,11 +344,11 @@ always_comb begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1; 
 		if (cnt_output != 6'h09) begin
-			cnt_hidden_clr = 1'b1;
+			//cnt_hidden_clr = 1'b1;
 			mac_clr = 1'b1;
-			addr_hidden_unit_clr = 1'b1;
+			cnt_hidden_inc = 1'b1;
 			addr_output_unit_inc = 1'b1;
-			cnt_output_inc = 1'b1;
+			addr_hidden_unit_inc = 1'b1;
 			
 			nxt_state = MAC_OUTPUT;
 		end
