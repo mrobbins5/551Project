@@ -102,8 +102,8 @@ end
 //////////////////////////////
 logic [10:0] rect_addr;
 
-assign rect_addr = (acc[25] == 0 && |acc[24:17] ) ? 11'h3FF :
-		(acc[25] == 1 && &acc[24:17]) ? 11'h400 : acc [17:7];
+assign rect_addr[10:0] = (!(acc[25]) && (|acc[24:17])) ? 11'h3FF :
+		((acc[25]) && !(&acc[24:17])) ? 11'h400 : acc [17:7];
 assign addr_act_func = rect_addr + 11'h400; 
 
 /////////////////////////////////////////////////////
@@ -162,17 +162,16 @@ logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
 
-always_comb begin
+always_ff @(posedge clk, negedge rst_n)begin
 	if (!rst_n) begin
-		maxVal = 8'b0;
-		maxInd = 8'b0;
+		maxInd <= 4'b0;
+		maxVal <= 8'b0;
 	end
-	else if (compare) begin
-		if (maxVal <  q_unit_output) begin
-			maxVal = q_unit_output;
-			maxInd = addr_output_unit;
-		end
+	else if ((maxVal <  d_output_unit) && macIn1Sel) begin ///read memh part done to get current values
+		maxVal <= d_output_unit;
+		maxInd <= addr_output_unit; 
 	end
+	
 end
 
 //assign maxVal = (compare && (maxVal >  d_output_unit)) ? maxVal : d_output_unit;
@@ -187,20 +186,7 @@ end
 		maxInd <= addr_output_unit; 
 	end*/
 
-	/*if (!rst_n) begin
-		maxInd = 4'b0;
-		maxVal = 8'b0;
-	end
-	else begin
-	for(y = 7; y >= 0; y--) begin
-		if(maxVal[y] != d_output_unit[y]) begin ///read memh part done to get current values
-			if(!maxVal[y]) begin
-				maxVal = d_output_unit;
-				maxInd = addr_output_unit; 
-				end
-			end
-		end
-	end*/
+	/**/
 //end
 
 //////////////////////////////////////
@@ -300,6 +286,7 @@ always_comb begin
 	end
 	
 	MAC_HIDDEN_BP2 : begin //Take time to do yield the output
+		mac_clr = 1'b1; 
 		nxt_state = MAC_HIDDEN_WRITE; 
 	end
 	
@@ -311,7 +298,6 @@ always_comb begin
 		if (cnt_hidden != 5'h1f) begin //Haven't finished all 32 nodes
 			cnt_hidden_inc = 1'b1;
 			cnt_input_clr = 1'b1; 
-			mac_clr = 1'b1; 
 			nxt_state = MAC_HIDDEN;
 		end	
 		else begin
@@ -321,6 +307,7 @@ always_comb begin
 			addr_hidden_unit_clr = 1'b1;  // start at the begining of the ram
 			cnt_output_clr = 1'b1;
 			nxt_state = MAC_OUTPUT;
+			mac_clr = 1'b1;
 		end
 	end
 	
@@ -328,7 +315,7 @@ always_comb begin
 			macIn1Sel = 1'b1;
 			macIn2Sel = 1'b1;
 		if (cnt_hidden != 5'h1f) begin
-			addr_hidden_unit_inc = 1'b1;
+			addr_hidden_unit_inc = 1'b1;//
 			cnt_hidden_inc = 1'b1;
 			nxt_state = MAC_OUTPUT;
 		end
@@ -347,6 +334,7 @@ always_comb begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
 		cnt_hidden_clr = 1'b1; 
+		
 		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	
