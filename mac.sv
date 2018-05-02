@@ -25,7 +25,8 @@ end
 
 assign mult_ext = {{10{mult[15]}}, mult[15:0]};
 
-assign acc_nxt = (clr) ? (mult_ext + acc) : 26'b0;   //Sets the next value of transition (If not reset) to be equalt to mult+acc 
+assign acc_nxt = (!clr) ? add : 26'b0;   //Sets the next value of transition (If not reset) to be equalt to mult+acc 
+assign add = mult_ext + acc;
 assign mult = in1*in2; 
 		
 

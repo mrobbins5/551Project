@@ -17,7 +17,10 @@ logic [10:0] addr_act_func;
 logic [9:0] cnt_input; 
 logic [4:0] cnt_hidden;
 logic [3:0] cnt_output; 
-logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr, macIn1Sel, macIn2Sel, doneFlag, cnt_output_inc, cnt_input_inc;
+logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr;
+logic cnt_hidden_inc, cnt_input_inc, cnt_output_inc;
+
+logic macIn1Sel, macIn2Sel, doneFlag;
 
 //Mac
 logic signed  [7:0] in1, in2; 		//Internal inputs for mac
@@ -84,7 +87,7 @@ always_ff @(posedge clk, negedge rst_n) begin
 		
 		if (cnt_hidden_clr)
 			cnt_hidden <= 5'b0; 
-		else if (cur_state == MAC_HIDDEN_WRITE || cur_state == MAC_OUTPUT)
+		else if (cnt_hidden_inc)
 			cnt_hidden <= cnt_hidden + 1'b1; 
 			
 		if (cnt_output_clr)
@@ -97,6 +100,7 @@ end
 //////////////////////////////
 ////////// MAC RECT //////////
 //////////////////////////////
+logic [10:0] rect_addr;
 
 assign rect_addr = (acc[25] == 0 && |acc[24:17] ) ? 11'h3FF :
 		(acc[25] == 1 && &acc[24:17]) ? 11'h400 : acc [17:7];
@@ -109,9 +113,9 @@ assign addr_act_func = rect_addr + 11'h400;
 always_ff @ (posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
 		addr_input_unit 	<= 10'b0;
-		addr_hidden_weight 	<= 16'b0;
+		//addr_hidden_weight 	<= 16'b0;
 		addr_hidden_unit 	<= 5'b0;
-		addr_output_weight 	<= 9'b0;
+		//addr_output_weight 	<= 9'b0;
 		addr_output_unit 	<= 4'b0;
 		end
 	else begin
@@ -120,20 +124,20 @@ always_ff @ (posedge clk, negedge rst_n) begin
 		else if (addr_input_unit_inc)
 			addr_input_unit <= addr_input_unit + 1'b1;
 		
-		if (addr_hidden_weight_clr)
+		/*if (addr_hidden_weight_clr)
 			addr_hidden_weight <= 10'b0;
 		else
-			addr_hidden_weight[14:0] = {cnt_hidden[4:0], cnt_input[9:0]};
+			addr_hidden_weight[14:0] <= {cnt_hidden[4:0], cnt_input[9:0]};*/
 		
 		if (addr_hidden_unit_clr)
 			addr_hidden_unit <= 10'b0;
 		else if (addr_hidden_unit_inc)
 			addr_hidden_unit <= addr_hidden_unit + 1'b1;
 		
-		if (addr_output_weight_clr) 
+		/*if (addr_output_weight_clr) 
 			addr_output_weight <= 10'b0;
 		else
-			addr_output_weight[8:0] <= {cnt_output[3:0], cnt_hidden[4:0]};
+			addr_output_weight[8:0] <= {cnt_output[3:0], cnt_hidden[4:0]};*/
 			
 		if (addr_output_unit_clr) 
 			addr_output_unit <= 10'b0;
@@ -142,6 +146,14 @@ always_ff @ (posedge clk, negedge rst_n) begin
 	end
 end
 
+assign addr_hidden_weight[14:0] = (addr_hidden_weight_clr) ? 10'b0 : {cnt_hidden[4:0], cnt_input[9:0]};
+assign addr_output_weight[8:0] = (addr_output_weight_clr) ? 10'b0 : {cnt_output[3:0], cnt_hidden[4:0]};
+/*assign addr_output_unit = (addr_output_unit_clr) ? 10'b0 :
+		(addr_output_unit_inc) ? addr_output_unit + 1'b1 : addr_output_unit;
+assign addr_hidden_unit = (addr_hidden_unit_clr) ? 10'b0 :
+		(addr_hidden_unit_inc) ? addr_hidden_unit + 1'b1 : addr_hidden_unit;
+assign addr_input_unit = (addr_input_unit_clr) ? 10'b0 :
+		(addr_input_unit_inc) ? addr_input_unit + 1'b1 : addr_input_unit;*/
 ///////////////////////
 /////// COMPARE ///////
 ///////////////////////
@@ -150,8 +162,21 @@ logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
 
-assign maxVal = (compare && maxVal >=  d_output_unit) ? maxVal : d_output_unit;
-assign maxInd = (compare && maxVal >=  d_output_unit) ? maxInd : addr_output_unit;
+always_comb begin
+	if (!rst_n) begin
+		maxVal = 8'b0;
+		maxInd = 8'b0;
+	end
+	else if (compare) begin
+		if (maxVal <  q_unit_output) begin
+			maxVal = q_unit_output;
+			maxInd = addr_output_unit;
+		end
+	end
+end
+
+//assign maxVal = (compare && (maxVal >  d_output_unit)) ? maxVal : d_output_unit;
+//assign maxInd = (compare && (maxVal >  d_output_unit)) ? maxInd : addr_output_unit;
 
 	/*if (!rst_n) begin
 		maxInd <= 4'b0;
@@ -182,7 +207,7 @@ assign maxInd = (compare && maxVal >=  d_output_unit) ? maxInd : addr_output_uni
 /////////// ASSIGN OUTPUTS ///////////
 //////////////////////////////////////
 
-assign digit = maxInd;
+assign digit = (doneFlag) ? maxInd : digit;
 assign done = (doneFlag) ? 1'b1 : 1'b0; 
 
 assign q_ext = (q_input) ? 8'h7F : 8'h0; //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111)
@@ -214,6 +239,8 @@ always_comb begin
 	cnt_output_clr = 1'b0;
 	cnt_output_inc = 1'b0;
 	cnt_input_inc = 1'b0;
+	cnt_hidden_inc = 1'b0;
+	
 	mac_clr = 1'b0; 
 	doneFlag = 1'b0; 
 	
@@ -233,8 +260,8 @@ always_comb begin
 	macIn1Sel = 1'b0; 
 	macIn2Sel = 1'b0;
 	
-	we_ram_output_unit = 1'b0;
 	we_ram_hidden_unit = 1'b0;
+	we_ram_output_unit = 1'b0;
 	
 	compare = 1'b0;
 	
@@ -259,8 +286,8 @@ always_comb begin
 	MAC_HIDDEN : begin
 		//Check for both inputs to be received	
 		if (cnt_input != 12'h30F) begin //If we haven't counted to 784, stay here
-			addr_input_unit_inc = 1'b1;
 			cnt_input_inc = 1'b1;
+			addr_input_unit_inc = 1'b1;
 			nxt_state = MAC_HIDDEN;
 		end
 		else begin
@@ -280,10 +307,11 @@ always_comb begin
 		//Set the inputs to the MAC 		
 		we_ram_hidden_unit = 1'b1; //Write to ram_hidden_unit
 		addr_input_unit_clr = 1'b1;
-		if (cnt_hidden != 5'h1F) begin //Haven't finished all 32 nodes
+		addr_hidden_unit_inc = 1'b1;
+		if (cnt_hidden != 5'h1f) begin //Haven't finished all 32 nodes
+			cnt_hidden_inc = 1'b1;
 			cnt_input_clr = 1'b1; 
 			mac_clr = 1'b1; 
-			addr_hidden_unit_inc = 1'b1;
 			nxt_state = MAC_HIDDEN;
 		end	
 		else begin
@@ -299,9 +327,9 @@ always_comb begin
 	MAC_OUTPUT : begin
 			macIn1Sel = 1'b1;
 			macIn2Sel = 1'b1;
-		if (cnt_hidden != 5'h1F) begin
-			////addr_output_weight_inc = 1'b1;
+		if (cnt_hidden != 5'h1f) begin
 			addr_hidden_unit_inc = 1'b1;
+			cnt_hidden_inc = 1'b1;
 			nxt_state = MAC_OUTPUT;
 		end
 		else begin
@@ -318,7 +346,7 @@ always_comb begin
 	MAC_OUTPUT_BP2 : begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
-		/////////////////////////////cnt_hidden_clr = 1'b1; 
+		cnt_hidden_clr = 1'b1; 
 		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	

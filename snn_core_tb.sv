@@ -11,12 +11,17 @@ snn_core instance2(clk, rst_n, start, q_input, addr_input_unit, digit, done);
 
 initial begin
 	clk = 0;
-	rst_n = 0;
+	#5 rst_n = 0;
 	we = 0;
 	uart_data = 1'b1;
 	#5 rst_n = 1;
 	start = 1;
+	#50 start = 0;
 end
+
+initial $monitor("IN#%d %d %d#%d, acc:%d@%d", snn_core_tb.instance2.addr_input_unit,snn_core_tb.instance2.in1,
+snn_core_tb.instance2.in2,snn_core_tb.instance2.addr_hidden_weight,
+snn_core_tb.instance2.acc,snn_core_tb.instance2.addr_hidden_unit);
 	
 always
 	#5 clk = ~ clk;
