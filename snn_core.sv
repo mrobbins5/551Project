@@ -288,15 +288,17 @@ always_comb begin
 	MAC_HIDDEN_BP2 : begin //Take time to do yield the output
 		mac_clr = 1'b1; 
 		nxt_state = MAC_HIDDEN_WRITE; 
+		
 	end
 	
 	MAC_HIDDEN_WRITE : begin
 		//Set the inputs to the MAC 		
 		we_ram_hidden_unit = 1'b1; //Write to ram_hidden_unit
 		addr_input_unit_clr = 1'b1;
+		cnt_hidden_inc = 1'b1;
 		addr_hidden_unit_inc = 1'b1;
+		
 		if (cnt_hidden != 5'h1f) begin //Haven't finished all 32 nodes
-			cnt_hidden_inc = 1'b1;
 			cnt_input_clr = 1'b1; 
 			nxt_state = MAC_HIDDEN;
 		end	
@@ -306,8 +308,8 @@ always_comb begin
 			macIn2Sel = 1'b1;
 			addr_hidden_unit_clr = 1'b1;  // start at the begining of the ram
 			cnt_output_clr = 1'b1;
-			nxt_state = MAC_OUTPUT;
 			mac_clr = 1'b1;
+			nxt_state = MAC_OUTPUT;
 		end
 	end
 	
@@ -333,9 +335,9 @@ always_comb begin
 	MAC_OUTPUT_BP2 : begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
-		cnt_hidden_clr = 1'b1; 
-		addr_hidden_unit_clr = 1'b1;
-		cnt_output_inc = 1'b1;
+		//cnt_hidden_clr = 1'b1; 
+					addr_output_unit_inc = 1'b1;
+			cnt_output_inc = 1'b1;
 		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	
@@ -344,11 +346,11 @@ always_comb begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1; 
 		if (cnt_output != 6'h09) begin
-			//cnt_hidden_clr = 1'b1;
+			cnt_hidden_clr = 1'b1;
 			mac_clr = 1'b1;
-			cnt_hidden_inc = 1'b1;
-			addr_output_unit_inc = 1'b1;
-			addr_hidden_unit_inc = 1'b1;
+			addr_hidden_unit_clr = 1'b1;
+			//addr_output_unit_inc = 1'b1;
+			//cnt_output_inc = 1'b1;
 			
 			nxt_state = MAC_OUTPUT;
 		end
