@@ -162,12 +162,12 @@ logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
 
-always_ff @(posedge clk, negedge rst_n)begin
+always @(negedge rst_n, compare) begin
 	if (!rst_n) begin
 		maxInd <= 4'b0;
 		maxVal <= 8'b0;
 	end
-	else if ((maxVal <  d_output_unit) && macIn1Sel) begin ///read memh part done to get current values
+	else if (compare && (maxVal <  d_output_unit)) begin ///read memh part done to get current values
 		maxVal <= d_output_unit;
 		maxInd <= addr_output_unit; 
 	end
@@ -314,6 +314,7 @@ always_comb begin
 	end
 	
 	MAC_OUTPUT : begin
+	
 			macIn1Sel = 1'b1;
 			macIn2Sel = 1'b1;
 		if (cnt_hidden != 5'h1f) begin
@@ -335,6 +336,7 @@ always_comb begin
 	MAC_OUTPUT_BP2 : begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
+		compare = 1'b1;
 		//cnt_hidden_clr = 1'b1; 
 					addr_output_unit_inc = 1'b1;
 			cnt_output_inc = 1'b1;
@@ -345,6 +347,7 @@ always_comb begin
 		we_ram_output_unit = 1'b1; //Write to ram_output_unit
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1; 
+		
 		if (cnt_output != 6'h09) begin
 			cnt_hidden_clr = 1'b1;
 			mac_clr = 1'b1;
