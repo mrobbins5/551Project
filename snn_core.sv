@@ -55,7 +55,7 @@ logic [7:0] q_lut;
 
 rom_hidden_weight RHW(addr_hidden_weight, clk, q_weight_hidden); 	//Instantiate rom_hidden_weight
 rom_output_weight ROW(addr_output_weight, clk, q_weight_output); 	//Instantiate rom_output_weight 
-rom_act_func_lut RAFL(addr_act_func, clk, q_lut); 							//Instantiate rom_act_func_lut
+rom_act_func_lut RAFL(addr_act_func, clk, q_lut); 					//Instantiate rom_act_func_lut
 
 /////////////////////
 //////// RAM ////////
@@ -83,13 +83,11 @@ always_ff @(posedge clk, negedge rst_n) begin
 		if (cnt_input_clr)
 			cnt_input <= 10'b0; 
 		else if (cnt_input_inc)
-			cnt_input <= cnt_input + 1'b1;
-		
+			cnt_input <= cnt_input + 1'b1;	
 		if (cnt_hidden_clr)
 			cnt_hidden <= 5'b0; 
 		else if (cnt_hidden_inc)
-			cnt_hidden <= cnt_hidden + 1'b1; 
-			
+			cnt_hidden <= cnt_hidden + 1'b1; 		
 		if (cnt_output_clr)
 			cnt_output <= 4'b0; 
 		else if (cnt_output_inc)
@@ -113,9 +111,7 @@ assign addr_act_func = rect_addr + 11'h400;
 always_ff @ (posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
 		addr_input_unit 	<= 10'b0;
-		//addr_hidden_weight 	<= 16'b0;
 		addr_hidden_unit 	<= 5'b0;
-		//addr_output_weight 	<= 9'b0;
 		addr_output_unit 	<= 4'b0;
 		end
 	else begin
@@ -123,22 +119,10 @@ always_ff @ (posedge clk, negedge rst_n) begin
 			addr_input_unit <= 10'b0;
 		else if (addr_input_unit_inc)
 			addr_input_unit <= addr_input_unit + 1'b1;
-		
-		/*if (addr_hidden_weight_clr)
-			addr_hidden_weight <= 10'b0;
-		else
-			addr_hidden_weight[14:0] <= {cnt_hidden[4:0], cnt_input[9:0]};*/
-		
 		if (addr_hidden_unit_clr)
 			addr_hidden_unit <= 10'b0;
 		else if (addr_hidden_unit_inc)
-			addr_hidden_unit <= addr_hidden_unit + 1'b1;
-		
-		/*if (addr_output_weight_clr) 
-			addr_output_weight <= 10'b0;
-		else
-			addr_output_weight[8:0] <= {cnt_output[3:0], cnt_hidden[4:0]};*/
-			
+			addr_hidden_unit <= addr_hidden_unit + 1'b1;		
 		if (addr_output_unit_clr) 
 			addr_output_unit <= 10'b0;
 		else if (addr_output_unit_inc)
@@ -148,12 +132,7 @@ end
 
 assign addr_hidden_weight[14:0] = (addr_hidden_weight_clr) ? 10'b0 : {cnt_hidden[4:0], cnt_input[9:0]};
 assign addr_output_weight[8:0] = (addr_output_weight_clr) ? 10'b0 : {cnt_output[3:0], cnt_hidden[4:0]};
-/*assign addr_output_unit = (addr_output_unit_clr) ? 10'b0 :
-		(addr_output_unit_inc) ? addr_output_unit + 1'b1 : addr_output_unit;
-assign addr_hidden_unit = (addr_hidden_unit_clr) ? 10'b0 :
-		(addr_hidden_unit_inc) ? addr_hidden_unit + 1'b1 : addr_hidden_unit;
-assign addr_input_unit = (addr_input_unit_clr) ? 10'b0 :
-		(addr_input_unit_inc) ? addr_input_unit + 1'b1 : addr_input_unit;*/
+
 ///////////////////////
 /////// COMPARE ///////
 ///////////////////////
@@ -162,7 +141,7 @@ logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
 
-always @(negedge rst_n, compare) begin
+always @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
 		maxInd <= 4'b0;
 		maxVal <= 8'b0;
@@ -173,21 +152,6 @@ always @(negedge rst_n, compare) begin
 	end
 	
 end
-
-//assign maxVal = (compare && (maxVal >  d_output_unit)) ? maxVal : d_output_unit;
-//assign maxInd = (compare && (maxVal >  d_output_unit)) ? maxInd : addr_output_unit;
-
-	/*if (!rst_n) begin
-		maxInd <= 4'b0;
-		maxVal <= 8'b0;
-	end
-	else if (maxVal >  d_output_unit) begin ///read memh part done to get current values
-		maxVal <= d_output_unit;
-		maxInd <= addr_output_unit; 
-	end*/
-
-	/**/
-//end
 
 //////////////////////////////////////
 /////////// ASSIGN OUTPUTS ///////////
@@ -202,10 +166,6 @@ assign d_output_unit = q_lut;
 
 assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; 				//(M1): ram_hidden_unit OR q_input(ext)
 assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; 	//(M2): rom_output_weight OR rom_hidden_weight
-
-always_comb begin
-
-end
 
 /////////////////////////////////////////////
 //////////////// CONTROL FSM ////////////////
@@ -251,7 +211,7 @@ always_comb begin
 	
 	compare = 1'b0;
 	
-	case(cur_state) 
+	case (cur_state) 
 	IDLE : begin
 		mac_clr = 1'b1; 
 		cnt_input_clr = 1'b1;
@@ -288,7 +248,6 @@ always_comb begin
 	MAC_HIDDEN_BP2 : begin //Take time to do yield the output
 		mac_clr = 1'b1; 
 		nxt_state = MAC_HIDDEN_WRITE; 
-		
 	end
 	
 	MAC_HIDDEN_WRITE : begin
@@ -297,7 +256,6 @@ always_comb begin
 		addr_input_unit_clr = 1'b1;
 		cnt_hidden_inc = 1'b1;
 		addr_hidden_unit_inc = 1'b1;
-		
 		if (cnt_hidden != 5'h1f) begin //Haven't finished all 32 nodes
 			cnt_input_clr = 1'b1; 
 			nxt_state = MAC_HIDDEN;
@@ -314,9 +272,8 @@ always_comb begin
 	end
 	
 	MAC_OUTPUT : begin
-	
-			macIn1Sel = 1'b1;
-			macIn2Sel = 1'b1;
+		macIn1Sel = 1'b1;
+		macIn2Sel = 1'b1;
 		if (cnt_hidden != 5'h1f) begin
 			addr_hidden_unit_inc = 1'b1;
 			cnt_hidden_inc = 1'b1;
@@ -328,8 +285,8 @@ always_comb begin
 	end
 	
 	MAC_OUTPUT_BP1 : begin
-			macIn1Sel = 1'b1;
-			macIn2Sel = 1'b1;
+		macIn1Sel = 1'b1;
+		macIn2Sel = 1'b1;
 		nxt_state = MAC_OUTPUT_BP2; 
 	end
 	
@@ -337,24 +294,19 @@ always_comb begin
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1;
 		compare = 1'b1;
-		//cnt_hidden_clr = 1'b1; 
-					addr_output_unit_inc = 1'b1;
-			cnt_output_inc = 1'b1;
+		addr_output_unit_inc = 1'b1;
+		cnt_output_inc = 1'b1;
 		nxt_state = MAC_OUTPUT_WRITE; 
 	end
 	
 	MAC_OUTPUT_WRITE : begin
 		we_ram_output_unit = 1'b1; //Write to ram_output_unit
 		macIn1Sel = 1'b1;
-		macIn2Sel = 1'b1; 
-		
+		macIn2Sel = 1'b1; 	
 		if (cnt_output != 6'h09) begin
 			cnt_hidden_clr = 1'b1;
 			mac_clr = 1'b1;
-			addr_hidden_unit_clr = 1'b1;
-			//addr_output_unit_inc = 1'b1;
-			//cnt_output_inc = 1'b1;
-			
+			addr_hidden_unit_clr = 1'b1;		
 			nxt_state = MAC_OUTPUT;
 		end
 		else begin 

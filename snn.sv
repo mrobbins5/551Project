@@ -175,10 +175,11 @@ always_comb begin
 			nxt_state = RAM;
 		end
 		else if (cycle98_full) begin
+			start = 1'b1;
 			nxt_state = CORE;
 		end
 		else begin
-			start = 1'b1;
+			
 			cycle8_clr = 1'b1;
 			nxt_state = RX;
 		end
