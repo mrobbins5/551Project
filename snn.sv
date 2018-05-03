@@ -1,4 +1,4 @@
-module SNN(clk, sys_rst_n, led, uart_tx, uart_rx, addr_input_unit);
+module SNN(clk, sys_rst_n, led, uart_tx, uart_rx);
 input clk;			    // 50MHz clock
 input sys_rst_n;		// Unsynched reset from push button. Needs to be synchronized.
 output logic [7:0] led;	// Drives LEDs of DE0 nano board
@@ -20,7 +20,7 @@ rst_synch i_rst_synch(.clk(clk), .RST_n(sys_rst_n), .rst_n(rst_n));
 logic [9:0] Addr_FSM;
 logic Addr_FSM_clr, Addr_FSM_inc;
 
-always_ff @(posedge clk or negedge rst_n) begin
+always_ff @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
 		Addr_FSM <= 10'b0;
 	end
@@ -38,10 +38,11 @@ end
 
 logic q_input;
 logic we;
-output logic [9:0] addr_input_unit;
+logic [9:0] addr_input_unit;
 logic [7:0] uart_data;
 logic [9:0] Addr_SNN_CORE;
 logic ram_input_data;
+
 ram_input_unit RHU(ram_input_data, addr_input_unit, we, clk, q_input); 
 
 assign addr_input_unit = (we) ? Addr_FSM : Addr_SNN_CORE;
@@ -79,9 +80,19 @@ end
 uart_rx instance1(.clk(clk),.rst_n(rst_n),.rx(uart_rx_synch),.rx_rdy(rx_rdy),.rx_data(uart_data));
 uart_tx instance2(.clk(clk),.rst_n(rst_n),.tx_start(done),.tx_data(led),.tx(uart_tx),.tx_rdy(tx_rdy));
 
-logic one;
+logic [7:0] shifted_data;
+logic shift;
 
-assign {uart_data[7:0],ram_input_data} = {1'b1, uart_data[6:1], uart_data[0]};
+always_ff @ (posedge clk, negedge rst_n) begin
+	if (!rst_n) begin
+		shifted_data <= 8'b0;
+	end
+	else if (shift) begin
+		shifted_data <= (uart_data >> 1);
+	end
+end
+
+assign ram_input_data = shifted_data[0];
 
 ////////////////////////////////////
 /////  98 and 8 cycles counter /////
@@ -132,14 +143,15 @@ always_ff @(posedge clk, negedge rst_n) begin
 end
 
 always_comb begin
+	shift = 1'b0;
 	start = 1'b0;
 	we = 1'b0;
 	
 	Addr_FSM_clr = 1'b0;
 	Addr_FSM_inc = 1'b0;
 	
-	cycle98_clr = 1'b1;
-	cycle8_clr = 1'b1;
+	cycle98_clr = 1'b0;
+	cycle8_clr = 1'b0;
 	
 	cycle98_inc = 1'b0;
 	cycle8_inc = 1'b0;
@@ -157,6 +169,7 @@ always_comb begin
 	RAM: begin
 		if (!cycle8_full) begin
 			cycle8_inc = 1'b1;
+			shift = 1'b1;
 			we = 1'b1;
 			Addr_FSM_inc = 1'b1;
 			nxt_state = RAM;
@@ -166,6 +179,7 @@ always_comb begin
 		end
 		else begin
 			start = 1'b1;
+			cycle8_clr = 1'b1;
 			nxt_state = RX;
 		end
 	end
@@ -198,6 +212,6 @@ end
 //////// LED ////////
 /////////////////////
 
-assign led = {4'b0, digit};
+assign led = {4'b0011, digit};
 
 endmodule
