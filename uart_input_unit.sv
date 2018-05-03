@@ -1,4 +1,4 @@
-module ram_input_unit #(
+module uart_input_unit #(
 parameter DATA_WIDTH = 1'b1, parameter ADDR_WIDTH = 4'ha)(
 input [(DATA_WIDTH-1'b1):0] data,
 input [(ADDR_WIDTH-1'b1):0] addr,
@@ -11,7 +11,7 @@ reg [DATA_WIDTH-1'b1:0] ram[2**ADDR_WIDTH-1'b1:0];
 // Variable to hold the registered read address
 reg [ADDR_WIDTH-1'b1:0] addr_reg;
 
-initial $readmemh("uart_input_contents.txt", ram);
+initial $readmemb("uart_input_sample_5.txt", ram);
 
 always @ (posedge clk) begin
 	if (we) ram[addr] <= data; // Write
