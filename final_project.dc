@@ -1,0 +1,52 @@
+#Read in the verilog files first#
+
+read_file -format verilog { uart_tx.sv uart_rx.sv snn_core.sv snn.sv rst_synch.sv mac.sv ram_hidden_unit.sv ram_input_unit.sv ram_output_unit.sv rom_act_func_lut.sv rom_hidden_weight.sv rom_output_weight.sv }
+
+# Set Current Design to top level #
+set current_design snn
+
+# Contrain and assign clock #
+create_clock -name "clk" -period 2 -waveform {0 1} {clk}
+set_dont_touch_network [find port clk]
+
+
+# Constrain input timings & Drive #
+#Set variable prim_inputs#
+set prim_inputs [remove_from_collection [all_inputs] [find port clk]]
+set_input_delay -clock clk 0.5 $prim_inputs
+set_driving_cell -lib_cell AO33D0BWP -from_pin A1 -library tcbn401pbwptc $prim_inputs
+set_drive 0.1 rst_n
+
+# Set drive on Bp to be Stronger #
+set_drive 3 [find port Bp]
+
+# Constrain output timing & loads #
+set_output_delay -clock clk 0.5 [all_outputs]
+set_load 0.1 [all_outputs]
+
+# Set wireload & transition time #
+set_wire_load_model -name TSMC32K_Lowk_Conservative -library tcbn401pbwptc
+set_max_transition 0.1 [current_design]
+
+
+# Compile the design #
+compile -map_effort medium
+
+# Set clock uncertainty and do fix hold #
+set_clock_uncertainty 0.15 clk
+set_fix_hold clk
+
+# Flatten hierarchy #
+ungroup -all -flatten
+
+# 2nd Compile #
+compile -ultra
+
+# Generate timing & Area reports #
+report_timing -delay max
+report_timing -delay min
+report_area > area.rpt
+
+# Write out resulting synthesized netlist #
+write -format verilog snn -output snn.vg
+
