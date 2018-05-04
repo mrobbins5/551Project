@@ -220,6 +220,13 @@ assign d_output_unit = q_lut;
 assign in1 = (macIn1Sel) ? q_hidden_unit : q_ext; 				//(M1): ram_hidden_unit OR q_input(ext)
 assign in2 = (macIn2Sel) ? q_weight_output : q_weight_hidden; 	//(M2): rom_output_weight OR rom_hidden_weight
 
+always_ff @(posedge clk, negedge rst_n) begin //FSM sequential logic
+	if (!rst_n)
+		digit <= 4'b0;
+	else if (doneFlag)
+		digit <= maxInd
+end
+
 /////////////////////////////////////////////
 //////////////// CONTROL FSM ////////////////
 /////////////////////////////////////////////
