@@ -1,12 +1,13 @@
 module snn_core(clk, rst_n, start, q_input, addr_input_unit, digit, done); 
 
+//input and ouput snn logic
 input logic start; 
 input logic q_input; 
 input logic clk, rst_n; 
-
 output logic [3:0] digit; 
 output logic done; 
 output logic [9:0] addr_input_unit; 
+
 logic [14:0] addr_hidden_weight;
 logic [4:0] addr_hidden_unit;
 logic [8:0] addr_output_weight;
@@ -150,12 +151,57 @@ always @(posedge clk, negedge rst_n) begin
 	else if(maxVal_MaxInd_clr) begin
 		maxInd <= 4'b0;
 		maxVal <= 8'b0;
+	end else if(compare) begin
+		//START COMPARISON
+		if(maxVal[7] != d_output_unit[7]) begin
+			if(d_output_unit[7]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end else if (maxVal[6] != d_output_unit[6]) begin
+			if(d_output_unit[6]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end else if (maxVal[5] != d_output_unit[5]) begin
+			if(d_output_unit[5]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end else if (maxVal[4] != d_output_unit[4]) begin
+			if(d_output_unit[4]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end else if (maxVal[3] != d_output_unit[3]) begin
+			if(d_output_unit[3]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end else if (maxVal[2] != d_output_unit[2]) begin
+			if(d_output_unit[2]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end else if (maxVal[1] != d_output_unit[1]) begin
+			if(d_output_unit[1]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end else if (maxVal[0] != d_output_unit[0]) begin
+			if(d_output_unit[0]) begin
+				maxVal <= d_output_unit;
+				maxInd <= addr_output_unit; 
+			end
+		end
 	end
+	
+	/*
 	else if (compare && (maxVal <  d_output_unit)) begin ///read memh part done to get current values
 		maxVal <= d_output_unit;
 		maxInd <= addr_output_unit; 
 	end
-	
+	*/
 end
 
 //////////////////////////////////////
