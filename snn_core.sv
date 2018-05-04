@@ -140,7 +140,7 @@ assign addr_output_weight[8:0] = (addr_output_weight_clr) ? 10'b0 : {cnt_output[
 logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
-logic maxVal_MaxInd_clr, default_flag; 
+logic maxVal_MaxInd_clr, done_flag; 
 
 always @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
@@ -162,7 +162,20 @@ end
 /////////// ASSIGN OUTPUTS ///////////
 //////////////////////////////////////
 
-assign digit = (doneFlag) ? maxInd : (default_flag) ? 4'b0 : digit;
+assign digit = (doneFlag) ? maxInd : digit;
+/*always_ff @(posedge clk, negedge rst_n) begin
+
+	if(!rst_n) begin
+		digit <= 4'b0;
+	end
+	else if(doneFlag) begin
+		digit <= maxInd;
+	end 
+	else begin
+		digit <= digit;
+	end
+end*/
+
 assign done = (doneFlag) ? 1'b1 : 1'b0; 
 
 assign q_ext = (q_input) ? 8'h7F : 8'h0; //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111)
@@ -216,8 +229,6 @@ always_comb begin
 	
 	compare = 1'b0;
 	
-	default_flag = 1'b0;
-	
 	maxVal_MaxInd_clr = 1'b0; 
 	
 	case (cur_state) 
@@ -235,9 +246,8 @@ always_comb begin
 		maxVal_MaxInd_clr = 1'b1; 
 		
 		if (start) begin
-			default_flag = 1'b1;
 			nxt_state = MAC_HIDDEN; 
-		else
+		end else
 			nxt_state = IDLE; 
 	end
 	
