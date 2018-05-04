@@ -1,12 +1,15 @@
 module snn_core(clk, rst_n, start, q_input, addr_input_unit, digit, done); 
 
 //input and ouput snn logic
-input logic start; 
-input logic q_input; 
+input logic start; 					 //Logic to start SNN_core
+input logic q_input; 				 //Bit by bit transmissioin of the bitmap
 input logic clk, rst_n; 
-output logic [3:0] digit; 
+output logic [3:0] digit; 			 // The Z output Number with the highest score
 output logic done; 
-output logic [9:0] addr_input_unit; 
+
+//The concatenated value (the real address) of Hidden weight address bits
+//and input addres sbits. 5 Hidden bits is MSB followed by the 10 input address. 
+output logic [9:0] addr_input_unit;  
 
 //rom and ram addresses
 logic [14:0] addr_hidden_weight;
@@ -16,9 +19,9 @@ logic [3:0] addr_output_unit;
 logic [10:0] addr_act_func;
 
 //FSM logic counters
-logic [9:0] cnt_input; 
-logic [4:0] cnt_hidden;
-logic [3:0] cnt_output; 
+logic [9:0] cnt_input; 					//The address of the X(input)
+logic [4:0] cnt_hidden;					//The hidden bits portion of the address
+logic [3:0] cnt_output; 				//The output bits address (0-9)
 logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr;	//counter clear flags
 logic cnt_hidden_inc, cnt_input_inc, cnt_output_inc;	//counter increment flags
 
@@ -66,10 +69,9 @@ rom_act_func_lut RAFL(addr_act_func, clk, q_lut); 					//Instantiate rom_act_fun
 logic [7:0] d_hidden_unit, q_hidden_unit;
 logic [7:0] d_output_unit;
 logic signed [7:0] q_ext;
-logic we_ram_hidden_unit; //we_ram_output_unit; //NEED TO SAY WHEN TO WRITE TO RAM
+logic we_ram_hidden_unit; //When we write to ram 
 
 ram_hidden_unit RHU(d_hidden_unit, addr_hidden_unit, we_ram_hidden_unit, clk, q_hidden_unit);	//Instantiate ram_hidden_unit
-//ram_output_unit ROU(d_output_unit, addr_output_unit, we_ram_output_unit, clk, q_unit_output);	//Instantiate ram_output_unit
 
 ////////////////////////////////////////////
 //////////// 784, 32, and 10 COUNTER ////////////
@@ -144,7 +146,7 @@ assign addr_output_weight[8:0] = (addr_output_weight_clr) ? 10'b0 : {cnt_output[
 logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
-logic maxVal_MaxInd_clr, done_flag; 
+logic maxVal_MaxInd_clr; 
 
 always @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
@@ -201,12 +203,6 @@ always @(posedge clk, negedge rst_n) begin
 		end
 	end
 	
-	/*
-	else if (compare && (maxVal <  d_output_unit)) begin ///read memh part done to get current values
-		maxVal <= d_output_unit;
-		maxInd <= addr_output_unit; 
-	end
-	*/
 end
 
 //////////////////////////////////////
@@ -214,22 +210,10 @@ end
 //////////////////////////////////////
 
 assign digit = (doneFlag) ? maxInd : digit;
-/*always_ff @(posedge clk, negedge rst_n) begin
-
-	if(!rst_n) begin
-		digit <= 4'b0;
-	end
-	else if(doneFlag) begin
-		digit <= maxInd;
-	end 
-	else begin
-		digit <= digit;
-	end
-end*/
 
 assign done = (doneFlag) ? 1'b1 : 1'b0; 
 
-assign q_ext = (q_input) ? 8'h7F : 8'h0; //Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111)
+assign q_ext = (q_input) ? 8'h7F : 8'h0; 		//Extend 1-bit q_input to 8-bit to make it either 0 (8’b00000000) or 127 (8’b01111111)
 assign d_hidden_unit = q_lut;
 assign d_output_unit = q_lut;
 
@@ -276,7 +260,6 @@ always_comb begin
 	macIn2Sel = 1'b0;
 	
 	we_ram_hidden_unit = 1'b0;
-	//we_ram_output_unit = 1'b0;
 	
 	compare = 1'b0;
 	
@@ -373,7 +356,6 @@ always_comb begin
 	end
 	
 	MAC_OUTPUT_WRITE : begin
-	//	we_ram_output_unit = 1'b1; //Write to ram_output_unit
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1; 	
 		if (cnt_output != 6'h09) begin
