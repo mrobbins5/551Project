@@ -8,18 +8,19 @@ output logic [3:0] digit;
 output logic done; 
 output logic [9:0] addr_input_unit; 
 
+//rom and ram addresses
 logic [14:0] addr_hidden_weight;
 logic [4:0] addr_hidden_unit;
 logic [8:0] addr_output_weight;
 logic [3:0] addr_output_unit;
 logic [10:0] addr_act_func;
 
-//Counter 
+//FSM logic counters
 logic [9:0] cnt_input; 
 logic [4:0] cnt_hidden;
 logic [3:0] cnt_output; 
-logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr;
-logic cnt_hidden_inc, cnt_input_inc, cnt_output_inc;
+logic cnt_hidden_clr, cnt_input_clr, cnt_output_clr;	//counter clear flags
+logic cnt_hidden_inc, cnt_input_inc, cnt_output_inc;	//counter increment flags
 
 logic macIn1Sel, macIn2Sel, doneFlag;
 
@@ -35,7 +36,7 @@ logic addr_hidden_weight_clr;								//Rom hidden weight
 logic addr_hidden_unit_inc, 	addr_hidden_unit_clr;		//Ram hidden unit
 logic addr_output_unit_inc, 	addr_output_unit_clr;		//Ram output unit
 
-//FSM State
+//FSM States
 typedef enum logic [3:0] {IDLE, MAC_HIDDEN, MAC_HIDDEN_BP1, MAC_HIDDEN_BP2, MAC_HIDDEN_WRITE, 
 					MAC_OUTPUT, MAC_OUTPUT_BP1, MAC_OUTPUT_BP2, MAC_OUTPUT_WRITE, DONE} state_t; 
 state_t cur_state, nxt_state; 
@@ -43,13 +44,13 @@ state_t cur_state, nxt_state;
 ////////////////////
 //// MAC module ////
 ////////////////////
-
 mac MAC(.acc(acc), .in1(in1), .in2(in2), .clr(mac_clr), .clk(clk), .rst_n(rst_n)); //Instantiate mac
 
 /////////////////////
 //////// ROM ////////
 /////////////////////
 
+//weight of layers and the digit
 logic [7:0] q_weight_hidden;
 logic [7:0] q_weight_output;
 logic [7:0] q_lut;
@@ -63,17 +64,18 @@ rom_act_func_lut RAFL(addr_act_func, clk, q_lut); 					//Instantiate rom_act_fun
 /////////////////////
 
 logic [7:0] d_hidden_unit, q_hidden_unit;
-logic [7:0] d_output_unit, q_unit_output;
+logic [7:0] d_output_unit;
 logic signed [7:0] q_ext;
-logic we_ram_hidden_unit, we_ram_output_unit; //NEED TO SAY WHEN TO WRITE TO RAM
+logic we_ram_hidden_unit; //we_ram_output_unit; //NEED TO SAY WHEN TO WRITE TO RAM
 
 ram_hidden_unit RHU(d_hidden_unit, addr_hidden_unit, we_ram_hidden_unit, clk, q_hidden_unit);	//Instantiate ram_hidden_unit
-ram_output_unit ROU(d_output_unit, addr_output_unit, we_ram_output_unit, clk, q_unit_output);	//Instantiate ram_output_unit
+//ram_output_unit ROU(d_output_unit, addr_output_unit, we_ram_output_unit, clk, q_unit_output);	//Instantiate ram_output_unit
 
 ////////////////////////////////////////////
 //////////// 784, 32, and 10 COUNTER ////////////
 ////////////////////////////////////////////
 
+//FSM counters to assure correct logic flow
 always_ff @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
 		cnt_input	<= 10'b0; 
@@ -101,6 +103,7 @@ end
 //////////////////////////////
 logic [10:0] rect_addr;
 
+//rectify address logic
 assign rect_addr[10:0] = (!(acc[25]) && (|acc[24:17])) ? 11'h3FF :
 		((acc[25]) && !(&acc[24:17])) ? 11'h400 : acc [17:7];
 assign addr_act_func = rect_addr + 11'h400; 
@@ -152,7 +155,9 @@ always @(posedge clk, negedge rst_n) begin
 		maxInd <= 4'b0;
 		maxVal <= 8'b0;
 	end else if(compare) begin
+		
 		//START COMPARISON
+		//logically compare msb to lsb to find which digit is larger
 		if(maxVal[7] != d_output_unit[7]) begin
 			if(d_output_unit[7]) begin
 				maxVal <= d_output_unit;
@@ -271,7 +276,7 @@ always_comb begin
 	macIn2Sel = 1'b0;
 	
 	we_ram_hidden_unit = 1'b0;
-	we_ram_output_unit = 1'b0;
+	//we_ram_output_unit = 1'b0;
 	
 	compare = 1'b0;
 	
@@ -368,7 +373,7 @@ always_comb begin
 	end
 	
 	MAC_OUTPUT_WRITE : begin
-		we_ram_output_unit = 1'b1; //Write to ram_output_unit
+	//	we_ram_output_unit = 1'b1; //Write to ram_output_unit
 		macIn1Sel = 1'b1;
 		macIn2Sel = 1'b1; 	
 		if (cnt_output != 6'h09) begin
