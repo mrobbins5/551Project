@@ -140,9 +140,14 @@ assign addr_output_weight[8:0] = (addr_output_weight_clr) ? 10'b0 : {cnt_output[
 logic compare;
 logic [7:0] maxVal;
 logic [3:0] maxInd;
+logic maxVal_MaxInd_clr; 
 
 always @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
+		maxInd <= 4'b0;
+		maxVal <= 8'b0;
+	end
+	else if(maxVal_MaxInd_clr) begin
 		maxInd <= 4'b0;
 		maxVal <= 8'b0;
 	end
@@ -211,6 +216,8 @@ always_comb begin
 	
 	compare = 1'b0;
 	
+	maxVal_MaxInd_clr = 1'b0; 
+	
 	case (cur_state) 
 	IDLE : begin
 		mac_clr = 1'b1; 
@@ -222,6 +229,7 @@ always_comb begin
 		addr_hidden_unit_clr = 1'b1;
 		addr_output_weight_clr = 1'b1;
 		addr_output_unit_clr = 1'b1;
+		maxVal_MaxInd_clr = 1'b1; 
 		
 		if (start)
 			nxt_state = MAC_HIDDEN; 
