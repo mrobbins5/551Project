@@ -65,8 +65,6 @@ logic rx_rdy;
 logic shift;
 logic [7:0] tempData; 
 
-
-
 /////////////////////
 //////// LED ////////
 /////////////////////
@@ -78,19 +76,19 @@ always_ff @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
 		uart_rx_ff		<= 1'b1;
 		uart_rx_synch	<= 1'b1;
-
-		
 		//Shifting logic
 		tempData <= 1'b0; 
 	end
 	else begin
 		uart_rx_ff 		<= uart_rx;
 		uart_rx_synch 	<= uart_rx_ff;
-		
 		//Shifting logic
-		if(rx_rdy) tempData <= uart_data; 
-		else if(shift) tempData <= (tempData >> 1); 
-		else tempData <= tempData; 
+		if (rx_rdy)
+			tempData <= uart_data; 
+		else if (shift)
+			tempData <= (tempData >> 1); 
+		else
+			tempData <= tempData; 
 	end
 end
 
@@ -99,7 +97,6 @@ end
 
 uart_rx instance1(.clk(clk),.rst_n(rst_n),.rx(uart_rx_synch),.rx_rdy(rx_rdy),.rx_data(uart_data));
 uart_tx instance2(.clk(clk),.rst_n(rst_n),.tx_start(done),.tx_data(led),.tx(uart_tx),.tx_rdy(tx_rdy));
-
 
 assign ram_input_data = tempData[0];
 
@@ -123,7 +120,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 		if (cycle8_clr) begin
 			cycle8 <= 1'b0;
 		end
-		
 		if (cycle8_inc) begin
 			cycle8 <= cycle8 + 1'b1;
 		end
@@ -164,11 +160,9 @@ always_comb begin
 	
 	cycle98_inc = 1'b0;
 	cycle8_inc = 1'b0;
-//	led_done = 1'b1; 
 	case(cur_state)
 	
 	RX: begin
-//	led_done = 0;   
 		if (rx_rdy) begin
 			cycle98_inc = 1'b1;
 	//		Addr_FSM_inc = 1'b1;
@@ -176,6 +170,7 @@ always_comb begin
 			nxt_state = RAM;
 		end
 		else begin
+			Addr_FSM_clr = 1'b1;
 			nxt_state = RX;
 		end
 	end
@@ -208,11 +203,11 @@ always_comb begin
 	
 	TX: begin
 		if (tx_rdy) begin
-			Addr_FSM_clr = 1'b1;
-			nxt_state = RX;
 			//clear everything because done. 
 			cycle98_clr = 1'b1;
 			cycle8_clr = 1'b1;
+			Addr_FSM_clr = 1'b1;
+			nxt_state = RX;
 		end
 		else begin
 			nxt_state = TX;
