@@ -65,6 +65,14 @@ logic rx_rdy;
 logic shift;
 logic [7:0] tempData; 
 
+logic led_done; 
+logic [3:0] digit_led_setup;
+/////////////////////
+//////// LED ////////
+/////////////////////
+assign digit = (led_done) ? digit : 1'b0; 
+assign led = {4'b00, digit};
+
 // Double flop RX for meta-stability reasons
 always_ff @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
@@ -155,10 +163,11 @@ always_comb begin
 	
 	cycle98_inc = 1'b0;
 	cycle8_inc = 1'b0;
-	
+	led_done = 1'b1; 
 	case(cur_state)
 	
 	RX: begin
+	led_done = 0;   
 		if (rx_rdy) begin
 			cycle98_inc = 1'b1;
 	//		Addr_FSM_inc = 1'b1;
@@ -203,7 +212,6 @@ always_comb begin
 			//clear everything because done. 
 			cycle98_clr = 1'b1;
 			cycle8_clr = 1'b1;
-	
 		end
 		else begin
 			nxt_state = TX;
@@ -216,10 +224,6 @@ always_comb begin
 endcase
 end
 
-/////////////////////
-//////// LED ////////
-/////////////////////
 
-assign led = {4'b000, digit};
 
 endmodule
