@@ -162,7 +162,7 @@ always_comb begin
 		if (rx_rdy) begin
 			cycle98_inc = 1'b1;
 	//		Addr_FSM_inc = 1'b1;
-			we = 1'b1;
+			//we = 1'b1;//////////////////
 			nxt_state = RAM;
 		end
 		else begin
@@ -200,6 +200,10 @@ always_comb begin
 		if (tx_rdy) begin
 			Addr_FSM_clr = 1'b1;
 			nxt_state = RX;
+			//clear everything because done. 
+			cycle98_clr = 1'b1;
+			cycle8_clr = 1'b1;
+	
 		end
 		else begin
 			nxt_state = TX;
@@ -216,6 +220,6 @@ end
 //////// LED ////////
 /////////////////////
 
-assign led = {4'b0011, digit};
+assign led = {4'b000, digit};
 
 endmodule
