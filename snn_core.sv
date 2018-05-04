@@ -237,7 +237,7 @@ always_comb begin
 		if (start) begin
 			default_flag = 1'b1;
 			nxt_state = MAC_HIDDEN; 
-		end else
+		else
 			nxt_state = IDLE; 
 	end
 	
