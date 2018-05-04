@@ -43,7 +43,7 @@ logic [7:0] uart_data;
 logic [9:0] Addr_SNN_CORE;
 logic ram_input_data;
 
-ram_input_unit RHU(ram_input_data, addr_input_unit, we, clk, q_input); 
+ram_input_unit RHU(ram_input_data, addr_input_unit, we, clk, q_input); //where addr is coming from
 
 assign addr_input_unit = (we) ? Addr_FSM : Addr_SNN_CORE;
 
@@ -62,15 +62,26 @@ snn_core sc(clk, rst_n, start, q_input, Addr_SNN_CORE, digit, done);
 logic tx_rdy;
 logic rx_rdy;
 
+logic shift;
+logic [7:0] tempData; 
+
 // Double flop RX for meta-stability reasons
 always_ff @(posedge clk, negedge rst_n) begin
 	if (!rst_n) begin
 		uart_rx_ff		<= 1'b1;
 		uart_rx_synch	<= 1'b1;
+		
+		//Shifting logic
+		tempData <= 1'b0; 
 	end
 	else begin
 		uart_rx_ff 		<= uart_rx;
 		uart_rx_synch 	<= uart_rx_ff;
+		
+		//Shifting logic
+		if(rx_rdy) tempData <= uart_data; 
+		else if(shift) tempData <= (tempData >> 1); 
+		else tempData <= tempData; 
 	end
 end
 
@@ -80,19 +91,8 @@ end
 uart_rx instance1(.clk(clk),.rst_n(rst_n),.rx(uart_rx_synch),.rx_rdy(rx_rdy),.rx_data(uart_data));
 uart_tx instance2(.clk(clk),.rst_n(rst_n),.tx_start(done),.tx_data(led),.tx(uart_tx),.tx_rdy(tx_rdy));
 
-logic [7:0] shifted_data;
-logic shift;
 
-always_ff @ (posedge clk, negedge rst_n) begin
-	if (!rst_n) begin
-		shifted_data <= 8'b0;
-	end
-	else if (shift) begin
-		shifted_data <= (uart_data >> 1);
-	end
-end
-
-assign ram_input_data = shifted_data[0];
+assign ram_input_data = tempData[0];
 
 ////////////////////////////////////
 /////  98 and 8 cycles counter /////
@@ -161,17 +161,20 @@ always_comb begin
 	RX: begin
 		if (rx_rdy) begin
 			cycle98_inc = 1'b1;
+	//		Addr_FSM_inc = 1'b1;
+			we = 1'b1;
 			nxt_state = RAM;
 		end
-		else
+		else begin
 			nxt_state = RX;
+		end
 	end
 	RAM: begin
+		Addr_FSM_inc = 1'b1;
+		we = 1'b1;
 		if (!cycle8_full) begin
 			cycle8_inc = 1'b1;
-			shift = 1'b1;
-			we = 1'b1;
-			Addr_FSM_inc = 1'b1;
+			shift = 1'b1;		
 			nxt_state = RAM;
 		end
 		else if (cycle98_full) begin
@@ -179,7 +182,6 @@ always_comb begin
 			nxt_state = CORE;
 		end
 		else begin
-			
 			cycle8_clr = 1'b1;
 			nxt_state = RX;
 		end
@@ -196,6 +198,7 @@ always_comb begin
 	
 	TX: begin
 		if (tx_rdy) begin
+			Addr_FSM_clr = 1'b1;
 			nxt_state = RX;
 		end
 		else begin
