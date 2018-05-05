@@ -71,7 +71,7 @@ logic [7:0] tempData;
 //////// LED ////////
 /////////////////////
 //assign digit = (led_done) ? digit : 1'b0; 
-assign led = {4'b00, digit};
+assign led = (rst_n) ? {4'b00, digit} : 4'b0000;
 
 // Double flop RX for meta-stability reasons
 always_ff @(posedge clk, negedge rst_n) begin
