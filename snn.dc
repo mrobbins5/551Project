@@ -3,7 +3,7 @@
 read_file -format sverilog { snn.sv mac.sv uart_tx.sv uart_rx.sv snn_core.sv rst_synch.sv ram_hidden_unit.sv ram_input_unit.sv ram_output_unit.sv rom_act_func_lut.sv rom_hidden_weight.sv rom_output_weight.sv }
 
 # Set Current Design to top level #
-set current_design snn
+set current_design SNN
 
 # Contrain and assign clock #
 create_clock -name "clk" -period 2.5 -waveform {0 1} {clk}
@@ -40,5 +40,5 @@ report_timing -delay min
 report_area > area.rpt
 
 # Write out resulting synthesized netlist #
-write -format verilog snn -output snn.vg
+write -format verilog SNN -output snn.vg
 
