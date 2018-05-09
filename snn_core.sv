@@ -1,5 +1,7 @@
 module snn_core(clk, rst_n, start, q_input, addr_input_unit, digit, done); 
 
+
+
 //input and ouput snn logic
 input logic start; 					 //Logic to start SNN_core
 input logic q_input; 				 //Bit by bit transmissioin of the bitmap
@@ -209,7 +211,12 @@ end
 /////////// ASSIGN OUTPUTS ///////////
 //////////////////////////////////////
 
-assign digit = (doneFlag) ? maxInd : digit;
+always @ (*) begin
+	if (!rst_n)
+		digit <= 4'b0;
+	else if (doneFlag)
+		digit <= maxInd;
+end
 
 assign done = (doneFlag) ? 1'b1 : 1'b0; 
 
